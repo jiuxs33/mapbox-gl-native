@@ -514,9 +514,10 @@ void Renderer::Impl::render(const UpdateParameters& updateParameters) {
     }
 #endif
 
+    const bool needsRepaint = isMapModeContinuous && hasTransitions(parameters.timePoint);
     observer->onDidFinishRenderingFrame(
         loaded ? RendererObserver::RenderMode::Full : RendererObserver::RenderMode::Partial,
-        isMapModeContinuous && hasTransitions(parameters.timePoint)
+        needsRepaint
     );
 
     if (!loaded) {
@@ -524,6 +525,10 @@ void Renderer::Impl::render(const UpdateParameters& updateParameters) {
     } else if (renderState != RenderState::Fully) {
         renderState = RenderState::Fully;
         observer->onDidFinishRenderingMap();
+    } else if (!needsRepaint) {
+        // Notify observer about unused images when map is fully loaded
+        // and there are no ongoing transitions.
+        imageManager->reduceMemoryUseIfCacheSizeExceedsLimit();
     }
 
     if (updateParameters.mode == MapMode::Continuous) {
@@ -664,10 +669,8 @@ void Renderer::Impl::reduceMemoryUse() {
         entry.second->reduceMemoryUse();
     }
     backend.getContext().performCleanup();
+    imageManager->reduceMemoryUse();
     observer->onInvalidate();
-    if (imageManager) {
-        imageManager->reduceMemoryUse();
-    }
 }
 
 void Renderer::Impl::dumpDebugLogs() {

@@ -16,14 +16,14 @@ import com.mapbox.mapboxsdk.log.Logger;
 /**
  * IF YOU USE THIS CODE WITH MAPBOX MAPPING API, REMOVAL OR MODIFICATION OF
  * THE FOLLOWING CODE VIOLATES THE MAPBOX TERMS OF SERVICE.
- *
+ * <p>
  * The following code is used to access Mapbox's Mapping APIs. Removal or
  * modification of this code when used with Mapbox's Mapping APIs can result
  * in higher fees and/or termination of your account with Mapbox.
- *
+ * <p>
  * Under the Mapbox Terms of Service, you may not use this code to access
  * Mapbox Mapping APIs other than through Mapbox SDKs.
- *
+ * <p>
  * The Android documentation to access Mapping APIs is available at
  * https://www.mapbox.com/android and the Mapbox Terms of Service are
  * available at https://www.mapbox.com/tos/.
@@ -40,10 +40,12 @@ class AccountsManager {
   private String skuToken;
 
   private boolean isEnabled;
+  private boolean isManaged;
 
   AccountsManager() {
     isEnabled = isSkuTokenEnabled();
-    if (isEnabled) {
+    isManaged = isSkuTokenManaged();
+    if (isEnabled && isManaged) {
       String userId = validateUserId();
       validateRotation(userId);
     } else {
@@ -56,13 +58,35 @@ class AccountsManager {
     boolean value = MapboxConstants.DEFAULT_ENABLE_SKU_TOKEN;
     try {
       // Try getting a custom value from the app Manifest
-      ApplicationInfo appInfo = Mapbox.getApplicationContext().getPackageManager().getApplicationInfo(
-          Mapbox.getApplicationContext().getPackageName(),
-          PackageManager.GET_META_DATA);
+      ApplicationInfo appInfo = retrieveApplicationInfo();
       if (appInfo.metaData != null) {
         value = appInfo.metaData.getBoolean(
-            MapboxConstants.KEY_META_DATA_ENABLE_SKU_TOKEN,
-            MapboxConstants.DEFAULT_ENABLE_SKU_TOKEN
+          MapboxConstants.KEY_META_DATA_ENABLE_SKU_TOKEN,
+          MapboxConstants.DEFAULT_ENABLE_SKU_TOKEN
+        );
+      }
+    } catch (Exception exception) {
+      Logger.e(TAG, "Failed to read the package metadata: ", exception);
+    }
+
+    return value;
+  }
+
+  private ApplicationInfo retrieveApplicationInfo() throws PackageManager.NameNotFoundException {
+    return Mapbox.getApplicationContext().getPackageManager().getApplicationInfo(
+      Mapbox.getApplicationContext().getPackageName(),
+      PackageManager.GET_META_DATA);
+  }
+
+  private boolean isSkuTokenManaged() {
+    boolean value = MapboxConstants.DEFAULT_MANAGE_SKU_TOKEN;
+    try {
+      // Try getting a custom value from the app Manifest
+      ApplicationInfo appInfo = retrieveApplicationInfo();
+      if (appInfo.metaData != null) {
+        value = appInfo.metaData.getBoolean(
+          MapboxConstants.KEY_META_DATA_MANAGE_SKU_TOKEN,
+          MapboxConstants.DEFAULT_MANAGE_SKU_TOKEN
         );
       }
     } catch (Exception exception) {
@@ -97,13 +121,18 @@ class AccountsManager {
 
   @Nullable
   String getSkuToken() {
-    if (isEnabled && isExpired()) {
+    if (isManaged) {
+      if (isEnabled && isExpired()) {
+        SharedPreferences sharedPreferences = getSharedPreferences();
+        String userId = sharedPreferences.getString(PREFERENCE_USER_ID, "");
+        skuToken = generateSkuToken(userId);
+        timestamp = persistRotation(skuToken);
+      }
+    } else {
       SharedPreferences sharedPreferences = getSharedPreferences();
-      String userId = sharedPreferences.getString(PREFERENCE_USER_ID, "");
-      skuToken = generateSkuToken(userId);
-      timestamp = persistRotation(skuToken);
+      String notManagedSkuToken = sharedPreferences.getString(PREFERENCE_SKU_TOKEN, "");
+      skuToken = notManagedSkuToken;
     }
-
     return skuToken;
   }
 
@@ -127,7 +156,7 @@ class AccountsManager {
   @NonNull
   private SharedPreferences getSharedPreferences() {
     return Mapbox.getApplicationContext()
-        .getSharedPreferences(MapboxConstants.MAPBOX_SHARED_PREFERENCES, Context.MODE_PRIVATE);
+      .getSharedPreferences(MapboxConstants.MAPBOX_SHARED_PREFERENCES, Context.MODE_PRIVATE);
   }
 
   static long getNow() {

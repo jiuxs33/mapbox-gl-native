@@ -48,6 +48,16 @@ public class MapboxConstants {
   public static final boolean DEFAULT_ENABLE_SKU_TOKEN = false;
 
   /**
+   * Key used to switch SKU token management on/off in AndroidManifest.xml
+   */
+  public static final String KEY_META_DATA_MANAGE_SKU_TOKEN = "com.mapbox.ManageSkuToken";
+
+  /**
+   * Default value for KEY_META_DATA_MANAGE_SKU_TOKEN (default is on)
+   */
+  public static final boolean DEFAULT_MANAGE_SKU_TOKEN = true;
+
+  /**
    * Unmeasured state
    */
   public static final float UNMEASURED = -1f;

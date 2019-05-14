@@ -17,6 +17,7 @@ template <typename T> class Thread;
 } // namespace util
 
 class ResourceTransform;
+using PathChangeCallback = std::function<void ()>;
 
 class DefaultFileSource : public FileSource {
 public:
@@ -47,7 +48,7 @@ public:
 
     void setResourceTransform(optional<ActorRef<ResourceTransform>>&&);
 
-    void setResourceCachePath(const std::string&);
+    void setResourceCachePath(const std::string&, optional<ActorRef<PathChangeCallback>>&&);
 
     std::unique_ptr<AsyncRequest> request(const Resource&, Callback) override;
 

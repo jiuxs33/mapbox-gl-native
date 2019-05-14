@@ -1,6 +1,5 @@
 package com.mapbox.mapboxsdk.testapp.storage
 
-import android.os.Handler
 import android.support.test.annotation.UiThreadTest
 import android.support.test.rule.ActivityTestRule
 import android.support.test.runner.AndroidJUnit4
@@ -9,7 +8,6 @@ import com.mapbox.mapboxsdk.testapp.activity.FeatureOverviewActivity
 import org.junit.*
 import org.junit.rules.TestName
 import org.junit.runner.RunWith
-import java.util.concurrent.CountDownLatch
 
 @RunWith(AndroidJUnit4::class)
 class FileSourceStandaloneTest {
@@ -54,17 +52,6 @@ class FileSourceStandaloneTest {
 
     fileSourceTestUtils.changePath(fileSourceTestUtils.testPath)
     Assert.assertEquals(fileSourceTestUtils.testPath, FileSource.getResourcesCachePath(rule.activity))
-
-    // workaround for https://github.com/mapbox/mapbox-gl-native/issues/14334
-    val latch = CountDownLatch(1)
-    rule.activity.runOnUiThread {
-      fileSource.activate()
-      Handler().postDelayed({
-        fileSource.deactivate()
-        latch.countDown()
-      }, 2000)
-    }
-    latch.await()
 
     fileSourceTestUtils.changePath(fileSourceTestUtils.originalPath)
     Assert.assertEquals(fileSourceTestUtils.originalPath, FileSource.getResourcesCachePath(rule.activity))

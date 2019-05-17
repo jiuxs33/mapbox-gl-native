@@ -116,56 +116,53 @@ std::string localizeMapboxTilesetURL(const std::string& url) {
 }
 
 void localizeSourceURLs(mbgl::JSValue& root, mbgl::JSDocument& document) {
-    for (auto& sourceProperty : root.GetObject()) {
-        mbgl::JSValue& sourceValue = sourceProperty.value;
-        assert(sourceValue.HasMember("type"));
-        const std::string& typeValue = sourceValue["type"].GetString();
-        if (typeValue == "vector" || typeValue == "raster" || typeValue == "raster-dem") {
-            if (sourceValue.HasMember("url")) {
-                mbgl::JSValue& urlValue = sourceValue["url"];
-                urlValue.Set<std::string>(localizeLocalURL(urlValue.GetString()),
-                                          document.GetAllocator());
-            } else if (sourceValue.HasMember("tiles")) {
-                mbgl::JSValue& tilesValue = sourceValue["tiles"];
-                for (auto& tileValue : tilesValue.GetArray()) {
-                    tileValue.Set<std::string>(localizeLocalURL(tileValue.GetString()),
-                                               document.GetAllocator());
-                }
-            }
-        } else if (typeValue == "image") {
-            if (sourceValue.HasMember("url")) {
-                mbgl::JSValue& urlValue = sourceValue["url"];
-                urlValue.Set<std::string>(localizeLocalURL(urlValue.GetString()),
-                                          document.GetAllocator());
-            }
-        } else if (sourceValue.HasMember("video")) {
-            mbgl::JSValue& urlsValue = sourceValue["urls"];
-            for (auto& urlValue : urlsValue.GetArray()) {
-                urlValue.Set<std::string>(localizeLocalURL(urlValue.GetString()),
-                                          document.GetAllocator());
-            }
-        } else if (typeValue == "geojson") {
-            if (sourceValue.HasMember("data") && sourceValue["data"].IsString()) {
-                mbgl::JSValue& dataValue = sourceValue["data"];
-                dataValue.Set<std::string>(localizeLocalURL(dataValue.GetString()),
-                                           document.GetAllocator());
-            }
+    if (root.HasMember("tiles")) {
+        assert(root["tiles"].IsObject());
+        mbgl::JSValue& tilesValue = root["tiles"];
+        assert(tilesValue.IsArray());
+        for (auto& tileValue : tilesValue.GetArray()) {
+            tileValue.Set<std::string>(localizeMapboxTilesURL(tileValue.GetString()), document.GetAllocator());
+            tileValue.Set<std::string>(localizeLocalURL(tileValue.GetString()), document.GetAllocator());
         }
+    }
+
+    if (root.HasMember("urls")) {
+        mbgl::JSValue& urlsValue = root["urls"];
+        for (auto& urlValue : urlsValue.GetArray()) {
+            urlValue.Set<std::string>(localizeMapboxTilesetURL(urlValue.GetString()), document.GetAllocator());
+            urlValue.Set<std::string>(localizeLocalURL(urlValue.GetString()), document.GetAllocator());
+        }
+    }
+
+    if (root.HasMember("url")) {
+        mbgl::JSValue& urlValue = root["url"];
+        urlValue.Set<std::string>(localizeMapboxTilesetURL(urlValue.GetString()), document.GetAllocator());
+        urlValue.Set<std::string>(localizeLocalURL(urlValue.GetString()), document.GetAllocator());
+    }
+
+    if (root.HasMember("data") && root["data"].IsString()) {
+        mbgl::JSValue& dataValue = root["data"];
+        dataValue.Set<std::string>(localizeLocalURL(dataValue.GetString()), document.GetAllocator());
     }
 }
 
 void localizeStyleURLs(mbgl::JSValue& root, mbgl::JSDocument& document) {
     if (root.HasMember("sources")) {
-        localizeSourceURLs(root["sources"], document);
+        mbgl::JSValue& sourcesValue = root["sources"];
+        for (auto& sourceProperty : sourcesValue.GetObject()) {
+            localizeSourceURLs(sourceProperty.value, document);
+        }
     }
 
     if (root.HasMember("glyphs")) {
         mbgl::JSValue& glyphsValue = root["glyphs"];
+        glyphsValue.Set<std::string>(localizeMapboxFontsURL(glyphsValue.GetString()), document.GetAllocator());
         glyphsValue.Set<std::string>(localizeLocalURL(glyphsValue.GetString()), document.GetAllocator());
     }
 
     if (root.HasMember("sprite")) {
         mbgl::JSValue& spriteValue = root["sprite"];
+        spriteValue.Set<std::string>(localizeMapboxSpriteURL(spriteValue.GetString()), document.GetAllocator());
         spriteValue.Set<std::string>(localizeLocalURL(spriteValue.GetString()), document.GetAllocator());
     }
 }

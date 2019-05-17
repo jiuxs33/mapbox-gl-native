@@ -181,6 +181,7 @@ void TestRunner::runOperations() {
         printf("%s\n", filePath.c_str());
         map.getStyle().addImage(std::make_unique<mbgl::style::Image>(imageName, mbgl::decodeImage(*maybeImage), pixelRatio));
         imageName.erase(imageName.size() - 1);
+        render();
 
     // setStyle
     } else if (strcmp(operationArray[0].GetString(), setStyleOp) == 0) {
@@ -205,7 +206,11 @@ void TestRunner::runOperations() {
             buffer.Clear();
             rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
             document.Accept(writer);
-            map.getStyle().loadJSON(std::string(buffer.GetString()));
+
+            std::string styleJson(buffer.GetString());
+            printf("style:\n%s\n", styleJson.c_str());
+            map.getStyle().loadJSON(styleJson);
+            render();
         } else {
             localizeStyleURLs(operationArray[1], metadata.document);
 
@@ -213,7 +218,11 @@ void TestRunner::runOperations() {
             buffer.Clear();
             rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
             operationArray[1].Accept(writer);
-            map.getStyle().loadJSON(std::string(buffer.GetString()));
+
+            std::string styleJson(buffer.GetString());
+            printf("style:\n%s\n", styleJson.c_str());
+            map.getStyle().loadJSON(styleJson);
+            render();
         }
     } else {
         mbgl::Log::Debug(mbgl::Event::Setup, "Executing operation %s", operationArray[0].GetString());
@@ -230,7 +239,11 @@ double TestRunner::run() {
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
     metadata.document.Accept(writer);
 
-    map.getStyle().loadJSON(std::string(buffer.GetString()));
+    std::string styleJson(buffer.GetString());
+
+    printf("style:\n%s\n", styleJson.c_str());
+
+    map.getStyle().loadJSON(styleJson);
 
     render();
 

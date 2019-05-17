@@ -56,12 +56,6 @@ public:
           }()) {
     }
 
-    template <class BinaryProgram>
-    AttributeLocations(const BinaryProgram& program)
-        : locations{ program.attributeLocation(
-              concat_literals<&string_literal<'a', '_'>::value, &As::name>::value())... } {
-    }
-
     NamedAttributeLocations getNamedLocations() const {
         NamedAttributeLocations result;
 

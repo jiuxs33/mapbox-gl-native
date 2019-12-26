@@ -140,7 +140,7 @@ mbgl::style::CustomGeometrySource::Options MBGLCustomGeometrySourceOptionsFromDi
                           @"This will be logged only once.");
                 });
             }
-            mbgl::Feature geoJsonObject = [feature geoJSONObject].get<mbgl::Feature>();
+            mbgl::GeoJSONFeature geoJsonObject = [feature geoJSONObject].get<mbgl::GeoJSONFeature>();
             featureCollection.push_back(geoJsonObject);
         }
         const auto geojson = mbgl::GeoJSON{featureCollection};
@@ -199,11 +199,12 @@ mbgl::style::CustomGeometrySource::Options MBGLCustomGeometrySourceOptionsFromDi
 }
 
 - (void)setFeatures:(NSArray<MGLShape <MGLFeature> *>*)features inTileAtX:(NSUInteger)x y:(NSUInteger)y zoomLevel:(NSUInteger)zoomLevel {
+    MGLAssertStyleSourceIsValid();
     mbgl::CanonicalTileID tileID = mbgl::CanonicalTileID((uint8_t)zoomLevel, (uint32_t)x, (uint32_t)y);
     mbgl::FeatureCollection featureCollection;
     featureCollection.reserve(features.count);
     for (MGLShape <MGLFeature> * feature in features) {
-        mbgl::Feature geoJsonObject = [feature geoJSONObject].get<mbgl::Feature>();
+        mbgl::GeoJSONFeature geoJsonObject = [feature geoJSONObject].get<mbgl::GeoJSONFeature>();
         featureCollection.push_back(geoJsonObject);
         if ([feature isMemberOfClass:[MGLShapeCollection class]]) {
             static dispatch_once_t onceToken;
@@ -236,10 +237,12 @@ mbgl::style::CustomGeometrySource::Options MBGLCustomGeometrySourceOptionsFromDi
 }
 
 - (void) invalidateBounds:(MGLCoordinateBounds)bounds {
+    MGLAssertStyleSourceIsValid();
     ((mbgl::style::CustomGeometrySource *)self.rawSource)->invalidateRegion(MGLLatLngBoundsFromCoordinateBounds(bounds));
 }
 
 - (void) invalidateTileAtX:(NSUInteger)x y:(NSUInteger)y zoomLevel:(NSUInteger)z {
+    MGLAssertStyleSourceIsValid();
     ((mbgl::style::CustomGeometrySource *)self.rawSource)->invalidateTile(mbgl::CanonicalTileID(z, (unsigned int)x, (unsigned int)y));
 }
 

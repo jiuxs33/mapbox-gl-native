@@ -10,7 +10,7 @@
 #include <mbgl/util/run_loop.hpp>
 #include <mbgl/util/color.hpp>
 #include <mbgl/renderer/renderer.hpp>
-#include <mbgl/gl/headless_frontend.hpp>
+#include <mbgl/gfx/headless_frontend.hpp>
 
 using namespace mbgl;
 
@@ -33,8 +33,7 @@ public:
                   MapOptions().withMapMode(MapMode::Static).withSize(frontend.getSize())};
 
     void checkRendering(const char * name) {
-        test::checkImage(std::string("test/fixtures/annotations/") + name,
-                         frontend.render(map), 0.0002, 0.1);
+        test::checkImage(std::string("test/fixtures/annotations/") + name, frontend.render(map).image, 0.0002, 0.1);
     }
 };
 
@@ -355,12 +354,24 @@ TEST(Annotations, QueryRenderedFeatures) {
 
     test.frontend.render(test.map);
 
-    auto features = test.frontend.getRenderer()->queryRenderedFeatures(test.map.pixelForLatLng({ 0, 0 }));
+    // Batch conversion of latLngs to pixels
+    auto points = test.map.pixelsForLatLngs({{0, 0}, {50, 0}});
+    ASSERT_EQ(2, points.size());
+    // Single conversion of latLng to pixel
+    auto point0 = test.map.pixelForLatLng({0, 0});
+    ASSERT_NEAR(points[0].x, point0.x, 1e-8);
+    ASSERT_NEAR(points[0].y, point0.y, 1e-8);
+
+    auto point1 = test.map.pixelForLatLng({50, 0});
+    ASSERT_NEAR(points[1].x, point1.x, 1e-8);
+    ASSERT_NEAR(points[1].y, point1.y, 1e-8);
+
+    auto features = test.frontend.getRenderer()->queryRenderedFeatures(point0);
     EXPECT_EQ(features.size(), 1u);
     EXPECT_EQ(features[0].id.is<NullValue>(), false);
     EXPECT_EQ(features[0].id, uint64_t(0));
 
-    auto features2 = test.frontend.getRenderer()->queryRenderedFeatures(test.map.pixelForLatLng({ 50, 0 }));
+    auto features2 = test.frontend.getRenderer()->queryRenderedFeatures(point1);
     EXPECT_EQ(features2.size(), 1u);
     EXPECT_EQ(features[0].id.is<NullValue>(), false);
     EXPECT_EQ(features2[0].id, uint64_t(1));
@@ -434,6 +445,91 @@ TEST(Annotations, VisibleFeatures) {
     EXPECT_EQ(features.size(), ids.size());
 }
 
+TEST(Annotations, ViewFrustumCulling) {
+    // The purpose of the test is to control that annotations outside screen
+    // rectangle are not rendered for different camera setup, especially when
+    // using edge insets - viewport center is then offsetted.
+
+    // Important premise of this test is "static const float viewportPadding = 100;"
+    // as defined in collision_index.cpp: tests using edge insets are writen so that
+    // padding is 128 (half of viewSize width). If increasing viewportPadding,
+    // increase the padding in test cases below.
+    AnnotationTest test;
+
+    auto viewSize = test.frontend.getSize();
+    auto box = ScreenBox { {}, { double(viewSize.width), double(viewSize.height) } };
+
+    test.map.getStyle().loadJSON(util::read_file("test/fixtures/api/empty.json"));
+    test.map.addAnnotationImage(namedMarker("default_marker"));
+    const LatLng center = { 5.0, 5.0 };
+    test.map.jumpTo(CameraOptions().withCenter(center).withZoom(3.0));
+
+    // Batch conversion of pixels to latLngs
+    const std::vector<LatLng> batchLatLngs =
+        test.map.latLngsForPixels({ScreenCoordinate(0, 0),
+                                   ScreenCoordinate(viewSize.width, viewSize.height),
+                                   ScreenCoordinate(viewSize.width, 0),
+                                   ScreenCoordinate(0, viewSize.height)});
+    ASSERT_EQ(4, batchLatLngs.size());
+
+    // Single conversion of pixel to latLng
+    LatLng tl = test.map.latLngForPixel(ScreenCoordinate(0, 0));
+    ASSERT_NEAR(batchLatLngs[0].latitude(), tl.latitude(), 1e-8);
+    ASSERT_NEAR(batchLatLngs[0].longitude(), tl.longitude(), 1e-8);
+
+    LatLng br = test.map.latLngForPixel(ScreenCoordinate(viewSize.width, viewSize.height));
+    ASSERT_NEAR(batchLatLngs[1].latitude(), br.latitude(), 1e-8);
+    ASSERT_NEAR(batchLatLngs[1].longitude(), br.longitude(), 1e-8);
+
+    LatLng bl = test.map.latLngForPixel(ScreenCoordinate(viewSize.width, 0));
+    ASSERT_NEAR(batchLatLngs[2].latitude(), bl.latitude(), 1e-8);
+    ASSERT_NEAR(batchLatLngs[2].longitude(), bl.longitude(), 1e-8);
+
+    LatLng tr = test.map.latLngForPixel(ScreenCoordinate(0, viewSize.height));
+    ASSERT_NEAR(batchLatLngs[3].latitude(), tr.latitude(), 1e-8);
+    ASSERT_NEAR(batchLatLngs[3].longitude(), tr.longitude(), 1e-8);
+
+    std::vector<LatLng> latLngs = {tl, bl, tr, br, center};
+
+    std::vector<mbgl::AnnotationID> ids;
+    for (auto latLng : latLngs) {
+        ids.push_back(
+            test.map.addAnnotation(SymbolAnnotation{{latLng.longitude(), latLng.latitude()}, "default_marker"}));
+    }
+
+    std::vector<std::pair<CameraOptions, std::vector<uint64_t>>> expectedVisibleForCamera = {
+        // Start with all markers visible.
+        { CameraOptions(), { 0, 1, 2, 3, 4 } },
+        // Move center to topLeft: only former center and top left (now center) are visible.
+        { CameraOptions().withCenter(tl), { 0, 4 } },
+        // Reset center. With pitch: only top row markers and center are visible.
+        { CameraOptions().withCenter(center).withPitch(45), { 0, 1, 4 } },
+        // Reset pitch, and use padding to move viewport center: only topleft and center are visible.
+        { CameraOptions().withPitch(0).withPadding(EdgeInsets { viewSize.height * 0.5, viewSize.width * 0.5, 0, 0 }), { 0, 4 } },
+        // Use opposite padding to move viewport center: only bottom right and center are visible.
+        { CameraOptions().withPitch(0).withPadding(EdgeInsets { 0, 0, viewSize.height * 0.5, viewSize.width * 0.5 }), { 3, 4 } },
+        // Use top padding to move viewport center: top row and center are visible.
+        { CameraOptions().withPitch(0).withPadding(EdgeInsets { viewSize.height * 0.5, 0, 0, 0 }), { 0, 1, 4 } },
+        // Use bottom padding: only bottom right and center are visible.
+        { CameraOptions().withPitch(0).withPadding(EdgeInsets { 0, 0, viewSize.height * 0.5, 0 }), { 2, 3, 4 } },
+        // Left padding and pitch: top left, bottom left and center are visible.
+        { CameraOptions().withPitch(45).withPadding(EdgeInsets { 0, viewSize.width * 0.5, 0, 0 }), { 0, 2, 4 } }
+    };
+
+    for (unsigned i = 0; i < expectedVisibleForCamera.size(); i++) {
+        auto testCase = expectedVisibleForCamera[i];
+        test.map.jumpTo(testCase.first);
+        test.frontend.render(test.map);
+        auto features = test.frontend.getRenderer()->queryRenderedFeatures(box, {});
+        for (uint64_t id : testCase.second) { // testCase.second is vector of ids expected.
+            EXPECT_NE(std::find_if(features.begin(), features.end(), [&id](auto feature) {
+                return id == feature.id.template get<uint64_t>();
+            }), features.end()) << "Point with id "  << id << " is missing in test case " << i;
+            EXPECT_EQ(features.size(), testCase.second.size()) << " in test case " << i;
+        }
+    }
+}
+
 TEST(Annotations, TopOffsetPixels) {
     AnnotationTest test;
 
@@ -484,4 +580,3 @@ TEST(Annotations, ChangeMaxZoom) {
     test.map.jumpTo(CameraOptions().withZoom(*test.map.getBounds().maxZoom));
     test.checkRendering("line_annotation_max_zoom");
 }
-

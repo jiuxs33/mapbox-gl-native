@@ -20,21 +20,17 @@ private:
     void evaluate(const PropertyEvaluationParameters&) override;
     bool hasTransition() const override;
     bool hasCrossfade() const override;
-    void upload(gfx::UploadPass&, UploadParameters&) override;
-    void render(PaintParameters&, RenderSource*) override;
+    void prepare(const LayerPrepareParameters&) override;
+    void upload(gfx::UploadPass&) override;
+    void render(PaintParameters&) override;
 
-    bool queryIntersectsFeature(
-            const GeometryCoordinates&,
-            const GeometryTileFeature&,
-            const float,
-            const TransformState&,
-            const float,
-            const mat4&) const override;
+    bool queryIntersectsFeature(const GeometryCoordinates&, const GeometryTileFeature&, const float,
+                                const TransformState&, const float, const mat4&, const FeatureState&) const override;
 
     // Paint properties
     style::LinePaintProperties::Unevaluated unevaluated;
 
-    float getLineWidth(const GeometryTileFeature&, const float) const;
+    float getLineWidth(const GeometryTileFeature&, const float, const FeatureState&) const;
     void updateColorRamp();
 
     PremultipliedImage colorRamp;

@@ -6,6 +6,9 @@ const ejs = require('ejs');
 const spec = require('./style-spec');
 const colorParser = require('csscolorparser');
 
+// FIXME: https://github.com/mapbox/mapbox-gl-native/issues/15008
+delete spec.layout_circle["circle-sort-key"]
+
 require('./style-code');
 
 function parseCSSColor(str) {
@@ -30,6 +33,8 @@ global.expressionType = function (property) {
         case 'number':
         case 'enum':
             return 'NumberType';
+        case 'image':
+            return 'ImageType';
         case 'string':
             return 'StringType';
         case 'color':
@@ -60,6 +65,8 @@ global.evaluatedType = function (property) {
     return 'bool';
   case 'number':
     return 'float';
+  case 'resolvedImage':
+      return 'expression::Image';
   case 'formatted':
     return 'expression::Formatted';
   case 'string':
@@ -161,7 +168,8 @@ global.defaultValue = function (property) {
   }
   case 'formatted':
   case 'string':
-    return JSON.stringify(property.default || "");
+  case 'resolvedImage':
+    return property.default ? `{${JSON.stringify(property.default)}}` : '{}';
   case 'enum':
     if (property.default === undefined) {
       return `${evaluatedType(property)}::Undefined`;
@@ -183,9 +191,9 @@ global.defaultValue = function (property) {
   case 'array':
     const defaults = (property.default || []).map((e) => defaultValue({ type: property.value, default: e }));
     if (property.length) {
-      return `{{ ${defaults.join(', ')} }}`;
+      return `{{${defaults.join(', ')}}}`;
     } else {
-      return `{ ${defaults.join(', ')} }`;
+      return `{${defaults.join(', ')}}`;
     }
   default:
     return property.default;

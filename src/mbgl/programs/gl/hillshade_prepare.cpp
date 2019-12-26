@@ -1,5 +1,5 @@
 // NOTE: DO NOT CHANGE THIS FILE. IT IS AUTOMATICALLY GENERATED.
-
+// clang-format off
 #include <mbgl/programs/hillshade_prepare_program.hpp>
 #include <mbgl/programs/gl/preludes.hpp>
 #include <mbgl/programs/gl/shader_source.hpp>
@@ -15,7 +15,7 @@ struct ShaderSource;
 template <>
 struct ShaderSource<HillshadePrepareProgram> {
     static constexpr const char* name = "hillshade_prepare";
-    static constexpr const uint8_t hash[8] = { 0xe6, 0x01, 0xf2, 0xbb, 0xa0, 0x77, 0x1d, 0xeb };
+    static constexpr const uint8_t hash[8] = {0xbd, 0xa0, 0x8a, 0x88, 0x91, 0xe3, 0x73, 0x66};
     static constexpr const auto vertexOffset = 27698;
     static constexpr const auto fragmentOffset = 27991;
 };
@@ -29,8 +29,8 @@ constexpr const uint8_t ShaderSource<HillshadePrepareProgram>::hash[8];
 namespace gfx {
 
 template <>
-std::unique_ptr<Program<HillshadePrepareProgram>>
-Context::createProgram<gl::Context>(const ProgramParameters& programParameters) {
+std::unique_ptr<gfx::Program<HillshadePrepareProgram>>
+Backend::Create<gfx::Backend::Type::OpenGL>(const ProgramParameters& programParameters) {
     return std::make_unique<gl::Program<HillshadePrepareProgram>>(programParameters);
 }
 
@@ -68,11 +68,13 @@ varying vec2 v_pos;
 uniform vec2 u_dimension;
 uniform float u_zoom;
 uniform float u_maxzoom;
+uniform vec4 u_unpack;
 
 float getElevation(vec2 coord, float bias) {
     // Convert encoded elevation value to meters
     vec4 data = texture2D(u_image, coord) * 255.0;
-    return (data.r + data.g * 256.0 + data.b * 256.0 * 256.0) / 4.0;
+    data.a = -1.0;
+    return dot(data, u_unpack) / 4.0;
 }
 
 void main() {
@@ -133,4 +135,4 @@ void main() {
 }
 
 */
-
+// clang-format on

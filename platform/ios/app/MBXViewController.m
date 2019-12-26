@@ -1,3 +1,5 @@
+@import Mapbox;
+
 #import "MBXViewController.h"
 
 #import "MBXAppDelegate.h"
@@ -8,10 +10,10 @@
 #import "LimeGreenStyleLayer.h"
 #import "MBXEmbeddedMapViewController.h"
 #import "MBXOrnamentsViewController.h"
+#import "MBXStateManager.h"
+#import "MBXState.h"
 
 #import "MBXFrameTimeGraphView.h"
-
-#import <Mapbox/Mapbox.h>
 #import "../src/MGLMapView_Experimental.h"
 
 #import <objc/runtime.h>
@@ -105,6 +107,7 @@ typedef NS_ENUM(NSInteger, MBXSettingsMiscellaneousRows) {
     MBXSettingsMiscellaneousShowSnapshots,
     MBXSettingsMiscellaneousMissingIcon,
     MBXSettingsMiscellaneousShouldLimitCameraChanges,
+    MBXSettingsMiscellaneousSetContentInsets,
     MBXSettingsMiscellaneousShowCustomLocationManager,
     MBXSettingsMiscellaneousOrnamentsPlacement,
     MBXSettingsMiscellaneousPrintLogFile,
@@ -197,18 +200,19 @@ CLLocationCoordinate2D randomWorldCoordinate() {
 
 
 @property (nonatomic) IBOutlet MGLMapView *mapView;
+@property (nonatomic) MBXState *currentState;
 @property (weak, nonatomic) IBOutlet UIButton *hudLabel;
 @property (weak, nonatomic) IBOutlet MBXFrameTimeGraphView *frameTimeGraphView;
 @property (nonatomic) NSInteger styleIndex;
-@property (nonatomic) BOOL debugLoggingEnabled;
 @property (nonatomic) BOOL customUserLocationAnnnotationEnabled;
 @property (nonatomic, getter=isLocalizingLabels) BOOL localizingLabels;
 @property (nonatomic) BOOL reuseQueueStatsEnabled;
-@property (nonatomic) BOOL mapInfoHUDEnabled;
 @property (nonatomic) BOOL frameTimeGraphEnabled;
 @property (nonatomic) BOOL shouldLimitCameraChanges;
 @property (nonatomic) BOOL randomWalk;
+@property (nonatomic) BOOL zoomLevelOrnamentEnabled;
 @property (nonatomic) NSMutableArray<UIWindow *> *helperWindows;
+@property (nonatomic) NSMutableArray<UIView *> *contentInsetsOverlays;
 
 @end
 
@@ -219,31 +223,38 @@ CLLocationCoordinate2D randomWorldCoordinate() {
 @implementation MBXViewController
 {
     BOOL _isTouringWorld;
+    BOOL _contentInsetsEnabled;
+    UIEdgeInsets _originalContentInsets;
 }
 
 #pragma mark - Setup & Teardown
-
-+ (void)initialize
-{
-    if (self == [MBXViewController class])
-    {
-        [[NSUserDefaults standardUserDefaults] registerDefaults:@{
-            @"MBXUserTrackingMode": @(MGLUserTrackingModeNone),
-            @"MBXShowsUserLocation": @NO,
-            @"MBXDebug": @NO,
-        }];
-    }
-}
 
 - (void)viewDidLoad
 {
     [super viewDidLoad];
 
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(saveState:) name:UIApplicationDidEnterBackgroundNotification object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(restoreState:) name:UIApplicationWillEnterForegroundNotification object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(saveState:) name:UIApplicationWillTerminateNotification object:nil];
+    // Keep track of current map state and debug preferences,
+    // saving and restoring when the application's state changes.
+    self.currentState =  [MBXStateManager sharedManager].currentState;
 
-    [self restoreState:nil];
+    if (!self.currentState) {
+        // Create a new state with the below default values
+        self.currentState = [[MBXState alloc] init];
+
+        self.mapView.showsUserHeadingIndicator = YES;
+        self.mapView.showsScale = YES;
+        self.zoomLevelOrnamentEnabled = NO;
+        self.frameTimeGraphEnabled = NO;
+    } else {
+        // Revert to the previously saved state
+        [self restoreMapState:nil];
+    }
+
+    [self updateHUD];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(saveCurrentMapState:) name:UIApplicationDidEnterBackgroundNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(restoreMapState:) name:UIApplicationWillEnterForegroundNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(saveCurrentMapState:) name:UIApplicationWillTerminateNotification object:nil];
 
     if ([MGLAccountManager accessToken].length)
     {
@@ -251,9 +262,6 @@ CLLocationCoordinate2D randomWorldCoordinate() {
         [self cycleStyles:self];
     }
 
-    self.debugLoggingEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"MGLMapboxMetricsDebugLoggingEnabled"];
-    self.mapView.showsScale = YES;
-    self.mapView.showsUserHeadingIndicator = YES;
     self.mapView.experimental_enableFrameRateMeasurement = YES;
     self.hudLabel.titleLabel.font = [UIFont monospacedDigitSystemFontOfSize:10 weight:UIFontWeightRegular];
 
@@ -294,53 +302,6 @@ CLLocationCoordinate2D randomWorldCoordinate() {
     }];
 }
 
-- (void)saveState:(__unused NSNotification *)notification
-{
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSData *archivedCamera = [NSKeyedArchiver archivedDataWithRootObject:self.mapView.camera];
-    [defaults setObject:archivedCamera forKey:@"MBXCamera"];
-    [defaults setInteger:self.mapView.userTrackingMode forKey:@"MBXUserTrackingMode"];
-    [defaults setBool:self.mapView.showsUserLocation forKey:@"MBXShowsUserLocation"];
-    [defaults setInteger:self.mapView.debugMask forKey:@"MBXDebugMask"];
-    [defaults setBool:self.mapInfoHUDEnabled forKey:@"MBXShowsZoomLevelHUD"];
-    [defaults setBool:self.mapInfoHUDEnabled forKey:@"MBXShowsFrameTimeGraph"];
-    [defaults synchronize];
-}
-
-- (void)restoreState:(__unused NSNotification *)notification
-{
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSData *archivedCamera = [defaults objectForKey:@"MBXCamera"];
-    MGLMapCamera *camera = archivedCamera ? [NSKeyedUnarchiver unarchiveObjectWithData:archivedCamera] : nil;
-    if (camera)
-    {
-        self.mapView.camera = camera;
-    }
-    NSInteger uncheckedTrackingMode = [defaults integerForKey:@"MBXUserTrackingMode"];
-    if (uncheckedTrackingMode >= 0 &&
-        (NSUInteger)uncheckedTrackingMode >= MGLUserTrackingModeNone &&
-        (NSUInteger)uncheckedTrackingMode <= MGLUserTrackingModeFollowWithCourse)
-    {
-        self.mapView.userTrackingMode = (MGLUserTrackingMode)uncheckedTrackingMode;
-    }
-    self.mapView.showsUserLocation = [defaults boolForKey:@"MBXShowsUserLocation"];
-    NSInteger uncheckedDebugMask = [defaults integerForKey:@"MBXDebugMask"];
-    if (uncheckedDebugMask >= 0)
-    {
-        self.mapView.debugMask = (MGLMapDebugMaskOptions)uncheckedDebugMask;
-    }
-    if ([defaults boolForKey:@"MBXShowsZoomLevelHUD"])
-    {
-        self.mapInfoHUDEnabled = YES;
-        [self updateHUD];
-    }
-    if ([defaults boolForKey:@"MBXShowsFrameTimeGraph"])
-    {
-        self.frameTimeGraphEnabled = YES;
-        self.frameTimeGraphView.hidden = NO;
-    }
-}
-
 - (UIInterfaceOrientationMask)supportedInterfaceOrientations
 {
     return UIInterfaceOrientationMaskAll;
@@ -356,8 +317,6 @@ CLLocationCoordinate2D randomWorldCoordinate() {
 - (void)dealloc
 {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
-
-    [self saveState:nil];
 }
 
 #pragma mark - Debugging Interface
@@ -401,20 +360,20 @@ CLLocationCoordinate2D randomWorldCoordinate() {
     {
         case MBXSettingsDebugTools:
             [settingsTitles addObjectsFromArray:@[
-                @"Reset Position",
-                [NSString stringWithFormat:@"%@ Tile Boundaries",
+                @"Reset position",
+                [NSString stringWithFormat:@"%@ tile boundaries",
                     (debugMask & MGLMapDebugTileBoundariesMask ? @"Hide" :@"Show")],
-                [NSString stringWithFormat:@"%@ Tile Info",
+                [NSString stringWithFormat:@"%@ tile info",
                     (debugMask & MGLMapDebugTileInfoMask ? @"Hide" :@"Show")],
-                [NSString stringWithFormat:@"%@ Tile Timestamps",
+                [NSString stringWithFormat:@"%@ tile timestamps",
                     (debugMask & MGLMapDebugTimestampsMask ? @"Hide" :@"Show")],
-                [NSString stringWithFormat:@"%@ Collision Boxes",
+                [NSString stringWithFormat:@"%@ collision boxes",
                     (debugMask & MGLMapDebugCollisionBoxesMask ? @"Hide" :@"Show")],
-                [NSString stringWithFormat:@"%@ Overdraw Visualization",
+                [NSString stringWithFormat:@"%@ overdraw visualization",
                     (debugMask & MGLMapDebugOverdrawVisualizationMask ? @"Hide" :@"Show")],
-                [NSString stringWithFormat:@"%@ Map Info HUD", (_mapInfoHUDEnabled ? @"Hide" :@"Show")],
-                [NSString stringWithFormat:@"%@ Frame Time Graph", (_frameTimeGraphEnabled ? @"Hide" :@"Show")],
-                [NSString stringWithFormat:@"%@ Reuse Queue Stats", (_reuseQueueStatsEnabled ? @"Hide" :@"Show")]
+                [NSString stringWithFormat:@"%@ zoom level ornament", (self.zoomLevelOrnamentEnabled ? @"Hide" :@"Show")],
+                [NSString stringWithFormat:@"%@ frame time graph", (self.frameTimeGraphEnabled ? @"Hide" :@"Show")],
+                [NSString stringWithFormat:@"%@ reuse queue stats", (self.reuseQueueStatsEnabled ? @"Hide" :@"Show")]
             ]];
             break;
         case MBXSettingsAnnotations:
@@ -475,17 +434,10 @@ CLLocationCoordinate2D randomWorldCoordinate() {
                 @"Show Snapshots",
                 @"Missing Icon",
                 [NSString stringWithFormat:@"%@ Camera Changes", (_shouldLimitCameraChanges ? @"Unlimit" : @"Limit")],
+                [NSString stringWithFormat:@"Turn %@ Content Insets", (_contentInsetsEnabled ? @"Off" : @"On")],
                 @"View Route Simulation",
                 @"Ornaments Placement",
             ]];
-
-            if (self.debugLoggingEnabled)
-            {
-                [settingsTitles addObjectsFromArray:@[
-                    @"Print Telemetry Logfile",
-                    @"Delete Telemetry Logfile",
-                ]];
-            };
 
             break;
         default:
@@ -507,24 +459,25 @@ CLLocationCoordinate2D randomWorldCoordinate() {
                     [self.mapView resetPosition];
                     break;
                 case MBXSettingsDebugToolsTileBoundaries:
-                    self.mapView.debugMask ^= MGLMapDebugTileBoundariesMask;
+                    self.currentState.debugMask ^= MGLMapDebugTileBoundariesMask;
                     break;
                 case MBXSettingsDebugToolsTileInfo:
-                    self.mapView.debugMask ^= MGLMapDebugTileInfoMask;
+                    self.currentState.debugMask ^= MGLMapDebugTileInfoMask;
                     break;
                 case MBXSettingsDebugToolsTimestamps:
-                    self.mapView.debugMask ^= MGLMapDebugTimestampsMask;
+                    self.currentState.debugMask ^= MGLMapDebugTimestampsMask;
                     break;
                 case MBXSettingsDebugToolsCollisionBoxes:
-                    self.mapView.debugMask ^= MGLMapDebugCollisionBoxesMask;
+                    self.currentState.debugMask ^= MGLMapDebugCollisionBoxesMask;
                     break;
                 case MBXSettingsDebugToolsOverdrawVisualization:
-                    self.mapView.debugMask ^= MGLMapDebugOverdrawVisualizationMask;
+                    self.currentState.debugMask ^= MGLMapDebugOverdrawVisualizationMask;
                     break;
                 case MBXSettingsDebugToolsShowZoomLevel:
                 {
-                    self.mapInfoHUDEnabled = !self.mapInfoHUDEnabled;
-                    self.hudLabel.hidden = !self.mapInfoHUDEnabled;
+                    self.zoomLevelOrnamentEnabled = !self.zoomLevelOrnamentEnabled;
+                    self.currentState.showsZoomLevelOrnament = self.zoomLevelOrnamentEnabled;
+                    self.hudLabel.hidden = !self.zoomLevelOrnamentEnabled;
                     self.reuseQueueStatsEnabled = NO;
                     [self updateHUD];
                     break;
@@ -532,14 +485,16 @@ CLLocationCoordinate2D randomWorldCoordinate() {
                 case MBXSettingsDebugToolsShowFrameTimeGraph:
                 {
                     self.frameTimeGraphEnabled = !self.frameTimeGraphEnabled;
+                    self.currentState.showsTimeFrameGraph = !self.currentState.showsTimeFrameGraph;
                     self.frameTimeGraphView.hidden = !self.frameTimeGraphEnabled;
+                    [self updateHUD];
                     break;
                 }
                 case MBXSettingsDebugToolsShowReuseQueueStats:
                 {
-                    self.reuseQueueStatsEnabled = !self.reuseQueueStatsEnabled;
-                    self.hudLabel.hidden = !self.reuseQueueStatsEnabled;
-                    self.mapInfoHUDEnabled = NO;
+                    self.reuseQueueStatsEnabled = !self.currentState.reuseQueueStatsEnabled;
+                    self.hudLabel.hidden = !self.currentState.reuseQueueStatsEnabled;
+                    self.zoomLevelOrnamentEnabled = NO;
                     [self updateHUD];
                     break;
                 }
@@ -547,6 +502,9 @@ CLLocationCoordinate2D randomWorldCoordinate() {
                     NSAssert(NO, @"All debug tools setting rows should be implemented");
                     break;
             }
+
+            self.mapView.debugMask = self.currentState.debugMask;
+            
             break;
         case MBXSettingsAnnotations:
             switch (indexPath.row)
@@ -590,15 +548,12 @@ CLLocationCoordinate2D randomWorldCoordinate() {
                 case MBXSettingsAnnotationSelectRandomOffscreenPointAnnotation:
                     [self selectAnOffscreenPointAnnotation];
                     break;
-
                 case MBXSettingsAnnotationCenterSelectedAnnotation:
                     [self centerSelectedAnnotation];
                     break;
-
                 case MBXSettingsAnnotationAddVisibleAreaPolyline:
                     [self addVisibleAreaPolyline];
                     break;
-
                 default:
                     NSAssert(NO, @"All annotations setting rows should be implemented");
                     break;
@@ -699,13 +654,6 @@ CLLocationCoordinate2D randomWorldCoordinate() {
                 case MBXSettingsMiscellaneousRandomTour:
                     [self randomWorldTour];
                     break;
-
-                case MBXSettingsMiscellaneousPrintLogFile:
-                    [self printTelemetryLogFile];
-                    break;
-                case MBXSettingsMiscellaneousDeleteLogFile:
-                    [self deleteTelemetryLogFile];
-                    break;
                 case MBXSettingsMiscellaneousScrollView:
                 {
                     UIStoryboard *storyboard = [UIStoryboard storyboardWithName:@"Main" bundle:nil];
@@ -736,6 +684,61 @@ CLLocationCoordinate2D randomWorldCoordinate() {
                     self.shouldLimitCameraChanges = !self.shouldLimitCameraChanges;
                     if (self.shouldLimitCameraChanges) {
                         [self.mapView setCenterCoordinate:CLLocationCoordinate2DMake(39.748947, -104.995882) zoomLevel:10 direction:0 animated:NO];
+                    }
+                    break;
+                }
+                case MBXSettingsMiscellaneousSetContentInsets:
+                {
+                    if (!_contentInsetsEnabled) {
+                        _originalContentInsets = [self.mapView contentInset];
+                    }
+                    _contentInsetsEnabled = !_contentInsetsEnabled;
+                    self.automaticallyAdjustsScrollViewInsets = !_contentInsetsEnabled;
+                    UIEdgeInsets contentInsets = self.mapView.bounds.size.width > self.mapView.bounds.size.height
+                        ? UIEdgeInsetsMake(_originalContentInsets.top, 0.5 * self.mapView.bounds.size.width, _originalContentInsets.bottom, 0.0)
+                        : UIEdgeInsetsMake(0.25 * self.mapView.bounds.size.height, 0.0, _originalContentInsets.bottom, 0.25 * self.mapView.bounds.size.width);
+                    if (_contentInsetsEnabled) {
+                        if (!self.contentInsetsOverlays)
+                            self.contentInsetsOverlays = [NSMutableArray array];
+                        if (![self.contentInsetsOverlays count]) {
+                            UIView *view = [[UIView alloc]initWithFrame:CGRectMake(0, 0, self.mapView.bounds.size.width, contentInsets.top)];
+                            view.backgroundColor = [UIColor colorWithRed:0.0 green:0.3 blue:0.3 alpha:0.5];
+                            [self.contentInsetsOverlays addObject:view];
+                            [self.view addSubview:view];
+                            view = [[UIView alloc]initWithFrame:CGRectMake(0, 0, contentInsets.left, self.mapView.bounds.size.height)];
+                            view.backgroundColor = [UIColor colorWithRed:0.0 green:0.3 blue:0.3 alpha:0.5];
+                            [self.contentInsetsOverlays addObject:view];
+                            [self.view addSubview:view];
+                            view = [[UIView alloc]initWithFrame:CGRectMake(self.mapView.bounds.size.width - contentInsets.right, 0, contentInsets.right, self.mapView.bounds.size.height)];
+                            view.backgroundColor = [UIColor colorWithRed:0.0 green:0.3 blue:0.3 alpha:0.5];
+                            [self.contentInsetsOverlays addObject:view];
+                            [self.view addSubview:view];
+                            view = [[UIView alloc]initWithFrame:CGRectMake(0, self.mapView.bounds.size.height - contentInsets.bottom, self.mapView.bounds.size.width, self.mapView.bounds.size.height)];
+                            view.backgroundColor = [UIColor colorWithRed:0.0 green:0.3 blue:0.3 alpha:0.5];
+                            [self.contentInsetsOverlays addObject:view];
+                            [self.view addSubview:view];
+                        }
+                        [self.view bringSubviewToFront:self.contentInsetsOverlays[0]];
+                        [self.view bringSubviewToFront:self.contentInsetsOverlays[1]];
+                        [self.view bringSubviewToFront:self.contentInsetsOverlays[2]];
+                        [self.view bringSubviewToFront:self.contentInsetsOverlays[3]];
+
+                        // Denver streets parallel to cardinal directions help illustrate
+                        // viewport center offset when edge insets are set.
+                        MGLMapCamera *camera = [MGLMapCamera cameraLookingAtCenterCoordinate:CLLocationCoordinate2DMake(39.72707, -104.9986)
+                                                                              acrossDistance:100
+                                                                                       pitch:60
+                                                                                     heading:0];
+                        __weak MBXViewController *weakSelf = self;
+                        [self.mapView setCamera:camera withDuration:0.3 animationTimingFunction:nil completionHandler:^{
+                            [weakSelf.mapView setContentInset:contentInsets animated:YES completionHandler:nil];
+                        }];
+                    } else {
+                        [self.view sendSubviewToBack:self.contentInsetsOverlays[0]];
+                        [self.view sendSubviewToBack:self.contentInsetsOverlays[1]];
+                        [self.view sendSubviewToBack:self.contentInsetsOverlays[2]];
+                        [self.view sendSubviewToBack:self.contentInsetsOverlays[3]];
+                        [self.mapView setContentInset:_originalContentInsets animated:YES completionHandler:nil];
                     }
                     break;
                 }
@@ -1663,7 +1666,7 @@ CLLocationCoordinate2D randomWorldCoordinate() {
 - (void)selectAnOffscreenPointAnnotation {
     id<MGLAnnotation> annotation = [self randomOffscreenPointAnnotation];
     if (annotation) {
-        [self.mapView selectAnnotation:annotation animated:YES];
+        [self.mapView selectAnnotation:annotation animated:YES completionHandler:nil];
 
         NSAssert(self.mapView.selectedAnnotations.firstObject, @"The annotation was not selected");
     }
@@ -1709,37 +1712,6 @@ CLLocationCoordinate2D randomWorldCoordinate() {
 - (UIImage *)mapView:(MGLMapView *)mapView didFailToLoadImage:(NSString *)imageName {
     UIImage *backupImage = [UIImage imageNamed:@"AppIcon"];
     return backupImage;
-}
-
-- (void)printTelemetryLogFile
-{
-    NSString *fileContents = [NSString stringWithContentsOfFile:[self telemetryDebugLogFilePath] encoding:NSUTF8StringEncoding error:nil];
-    NSLog(@"%@", fileContents);
-}
-
-- (void)deleteTelemetryLogFile
-{
-    NSString *filePath = [self telemetryDebugLogFilePath];
-    if ([[NSFileManager defaultManager] isDeletableFileAtPath:filePath])
-    {
-        NSError *error;
-        BOOL success = [[NSFileManager defaultManager] removeItemAtPath:filePath error:&error];
-        if (success) {
-            NSLog(@"Deleted telemetry log.");
-        } else {
-            NSLog(@"Error deleting telemetry log: %@", error.localizedDescription);
-        }
-    }
-}
-
-- (NSString *)telemetryDebugLogFilePath
-{
-    NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
-    [dateFormatter setDateFormat:@"yyyy'-'MM'-'dd"];
-    [dateFormatter setTimeZone:[NSTimeZone systemTimeZone]];
-    NSString *filePath = [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject] stringByAppendingPathComponent:[NSString stringWithFormat:@"telemetry_log-%@.json", [dateFormatter stringFromDate:[NSDate date]]]];
-
-    return filePath;
 }
 
 #pragma mark - Random World Tour
@@ -1923,7 +1895,7 @@ CLLocationCoordinate2D randomWorldCoordinate() {
         // positioning rect)
 
         [self.mapView addAnnotation:pin];
-        [self.mapView selectAnnotation:pin animated:YES];
+        [self.mapView selectAnnotation:pin animated:YES completionHandler:nil];
     }
 }
 
@@ -2003,6 +1975,23 @@ CLLocationCoordinate2D randomWorldCoordinate() {
     }
     self.mapView.userTrackingMode = nextMode;
     [sender setAccessibilityValue:nextAccessibilityValue];
+}
+
+#pragma mark - UIViewDelegate
+
+- (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator
+{
+    [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];
+    if (_contentInsetsEnabled)
+    {
+        _contentInsetsEnabled = NO;
+        self.automaticallyAdjustsScrollViewInsets = YES;
+        [self.mapView setContentInset:UIEdgeInsetsZero];
+    }
+    while (self.contentInsetsOverlays && [self.contentInsetsOverlays count]) {
+        [[self.contentInsetsOverlays lastObject] removeFromSuperview];
+        [self.contentInsetsOverlays removeLastObject];
+    }
 }
 
 #pragma mark - MGLMapViewDelegate
@@ -2268,9 +2257,10 @@ CLLocationCoordinate2D randomWorldCoordinate() {
 }
 
 - (void)updateHUD {
-    if (!self.reuseQueueStatsEnabled && !self.mapInfoHUDEnabled) return;
 
-    if (self.hudLabel.hidden) self.hudLabel.hidden = NO;
+    if (self.reuseQueueStatsEnabled == NO && self.zoomLevelOrnamentEnabled == NO) {
+        return;
+    }
 
     NSString *hudString;
 
@@ -2280,7 +2270,7 @@ CLLocationCoordinate2D randomWorldCoordinate() {
             queuedAnnotations += queue.count;
         }
         hudString = [NSString stringWithFormat:@"Visible: %ld  Queued: %ld", (unsigned long)self.mapView.visibleAnnotations.count, (unsigned long)queuedAnnotations];
-    } else if (self.mapInfoHUDEnabled) {
+    } else if (self.zoomLevelOrnamentEnabled) {
         hudString = [NSString stringWithFormat:@"%.f FPS (%.1fms) ∕ %.2f ∕ ↕\U0000FE0E%.f° ∕ %.f°",
                      roundf(self.mapView.averageFrameRate), self.mapView.averageFrameTime,
                      self.mapView.zoomLevel, self.mapView.camera.pitch, self.mapView.direction];
@@ -2341,6 +2331,39 @@ CLLocationCoordinate2D randomWorldCoordinate() {
     if (self.frameTimeGraphEnabled) {
         [self.frameTimeGraphView updatePathWithFrameDuration:mapView.frameTime];
     }
+}
+
+- (void)saveCurrentMapState:(__unused NSNotification *)notification {
+
+    // The following properties can change after the view loads so we need to save their
+    // state before exiting the view controller.
+    self.currentState.camera = self.mapView.camera;
+    self.currentState.showsUserLocation = self.mapView.showsUserLocation;
+    self.currentState.userTrackingMode = self.mapView.userTrackingMode;
+    self.currentState.showsUserHeadingIndicator = self.mapView.showsUserHeadingIndicator;
+    self.currentState.showsMapScale = self.mapView.showsScale;
+    self.currentState.showsZoomLevelOrnament = self.zoomLevelOrnamentEnabled;
+    self.currentState.showsTimeFrameGraph = self.frameTimeGraphEnabled;
+    self.currentState.debugMask = self.mapView.debugMask;
+    self.currentState.reuseQueueStatsEnabled = self.reuseQueueStatsEnabled;
+
+    [[MBXStateManager sharedManager] saveState:self.currentState];
+}
+
+- (void)restoreMapState:(__unused NSNotification *)notification {
+    MBXState *currentState = [MBXStateManager sharedManager].currentState;
+
+    self.mapView.camera = currentState.camera;
+    self.mapView.showsUserLocation = currentState.showsUserLocation;
+    self.mapView.userTrackingMode = currentState.userTrackingMode;
+    self.mapView.showsUserHeadingIndicator = currentState.showsUserHeadingIndicator;
+    self.mapView.showsScale = currentState.showsMapScale;
+    self.zoomLevelOrnamentEnabled = currentState.showsZoomLevelOrnament;
+    self.frameTimeGraphEnabled = currentState.showsTimeFrameGraph;
+    self.mapView.debugMask = currentState.debugMask;
+    self.reuseQueueStatsEnabled = currentState.reuseQueueStatsEnabled;
+
+    self.currentState = currentState;
 }
 
 @end

@@ -8,19 +8,18 @@
 #if TARGET_OS_IPHONE || TARGET_OS_SIMULATOR
 #import "MGLMapboxEvents.h"
 #import "MBXSKUToken.h"
+
+static NSString * const MGLAccountManagerExternalClassName = @"MBXAccounts";
+static NSString * const MGLAccountManagerExternalMethodName = @"skuToken";
 #endif
 
-static BOOL _MGLAccountsSDKEnabled;
+NSString * const MGLMapboxAccountTypeKey = @"MGLMapboxAccountType";
 
 @interface MGLAccountManager ()
 
 @property (atomic) NSString *accessToken;
 @property (nonatomic) NSURL *apiBaseURL;
 
-#if TARGET_OS_IPHONE || TARGET_OS_SIMULATOR
-@property (atomic) NSString *skuToken;
-@property (atomic) NSDate *skuTokenExpiration;
-#endif
 @end
 
 @implementation MGLAccountManager
@@ -40,20 +39,6 @@ static BOOL _MGLAccountsSDKEnabled;
     if (apiBaseURL.length && [NSURL URLWithString:apiBaseURL]) {
         [self setAPIBaseURL:[NSURL URLWithString:apiBaseURL]];
     }
-
-#if TARGET_OS_IPHONE || TARGET_OS_SIMULATOR
-    // TODO: Use MGL_OBJC_DYNAMIC_CAST (that requires moving the macro, where it
-    // doesn't require a C++ header)
-    NSNumber *accountsSDKNumber = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"MGLMapboxAccountsSDKEnabled"];
-    if ([accountsSDKNumber isKindOfClass:[NSNumber class]]) {
-        _MGLAccountsSDKEnabled = ((NSNumber*)accountsSDKNumber).boolValue;
-    }
-    
-    if (self.isAccountsSDKEnabled) {
-        self.skuToken = [MBXSKUToken tokenForSKUID:MBXAccountsSKUIDMaps type:MBXAccountsSKUTypeUser];
-    }
-
-#endif
 }
 
 + (instancetype)sharedManager {
@@ -112,36 +97,14 @@ static BOOL _MGLAccountsSDKEnabled;
 
 #if TARGET_OS_IPHONE || TARGET_OS_SIMULATOR
 
-+ (BOOL)isAccountsSDKEnabled {
-    return _MGLAccountsSDKEnabled;
-}
-
-+ (void)setSkuToken:(NSString *)skuToken {
-    if (MGLAccountManager.isAccountsSDKEnabled) {
-        NSTimeInterval oneHour = 60 * 60; // TODO: make this const
-        MGLAccountManager.sharedManager.skuTokenExpiration = [NSDate dateWithTimeIntervalSinceNow:oneHour];
-        MGLAccountManager.sharedManager.skuToken = skuToken;
-    }
-    else {
-        MGLAccountManager.sharedManager.skuTokenExpiration = [NSDate distantFuture];
-        MGLAccountManager.sharedManager.skuToken = nil;
-    }
-}
-
 + (NSString *)skuToken {
-    if (MGLAccountManager.isAccountsSDKEnabled) {
-        return [MGLAccountManager.sharedManager isSKUTokenExpired] ?
-            [MBXSKUToken tokenForSKUID:MBXAccountsSKUIDMaps type:MBXAccountsSKUTypeUser] :
-            MGLAccountManager.sharedManager.skuToken;
+    Class mbx = NSClassFromString(MGLAccountManagerExternalClassName);
+    
+    if ([mbx respondsToSelector:NSSelectorFromString(MGLAccountManagerExternalMethodName)]) {
+        return (NSString *)[mbx valueForKeyPath:MGLAccountManagerExternalMethodName];
     }
-    else {
-        return nil;
-    }
-}
-
-- (BOOL)isSKUTokenExpired {
-    NSTimeInterval secondsUntilExpiration = [MGLAccountManager.sharedManager.skuTokenExpiration timeIntervalSinceDate:NSDate.date];
-    return secondsUntilExpiration < 0;
+    
+    return MBXSKUToken.skuToken;
 }
 
 #endif

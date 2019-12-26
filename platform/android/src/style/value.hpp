@@ -13,7 +13,7 @@ public:
     Value(jni::JNIEnv&, const jni::Object<>&);
 
     Value(Value&&)                 = default;
-    Value& operator=(Value&&)      = default;
+    Value& operator=(Value&&)      = delete;
 
     Value(const Value&)            = delete;
     Value& operator=(const Value&) = delete;
@@ -31,6 +31,7 @@ public:
     long toLong() const;
     bool toBool() const;
     Value get(const char* key) const;
+    Value keyArray() const;
     int getLength() const;
     Value get(const int index ) const;
 

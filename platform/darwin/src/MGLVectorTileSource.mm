@@ -1,6 +1,7 @@
 #import "MGLVectorTileSource_Private.h"
 
 #import "MGLFeature_Private.h"
+#import "MGLLoggingConfiguration_Private.h"
 #import "MGLSource_Private.h"
 #import "MGLTileSource_Private.h"
 #import "MGLStyle_Private.h"
@@ -38,17 +39,23 @@
 }
 
 - (NSURL *)configurationURL {
+    MGLAssertStyleSourceIsValid();
     auto url = self.rawSource->getURL();
     return url ? [NSURL URLWithString:@(url->c_str())] : nil;
 }
 
 - (NSString *)attributionHTMLString {
+    if (!self.rawSource) {
+        MGLAssert(0, @"Source with identifier `%@` was invalidated after a style change", self.identifier);
+        return nil;
+    }
+
     auto attribution = self.rawSource->getAttribution();
     return attribution ? @(attribution->c_str()) : nil;
 }
 
 - (NSArray<id <MGLFeature>> *)featuresInSourceLayersWithIdentifiers:(NSSet<NSString *> *)sourceLayerIdentifiers predicate:(nullable NSPredicate *)predicate {
-    
+    MGLAssertStyleSourceIsValid();
     mbgl::optional<std::vector<std::string>> optionalSourceLayerIDs;
     if (sourceLayerIdentifiers) {
         __block std::vector<std::string> layerIDs;

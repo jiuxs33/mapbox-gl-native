@@ -15,9 +15,8 @@ public:
     FeatureType getType() const override  {
         return apply_visitor(ToFeatureType(), feature.geometry);
     }
-    PropertyMap getProperties() const override { return feature.properties; }
+    const PropertyMap& getProperties() const override { return feature.properties; }
     FeatureIdentifier getID() const override { return feature.id; }
-    GeometryCollection getGeometries() const override { return {}; }
     optional<mbgl::Value> getValue(const std::string& key) const override {
         auto it = feature.properties.find(key);
         if (it != feature.properties.end()) {
@@ -27,10 +26,24 @@ public:
     }
 };
 
-
-EvaluationResult Expression::evaluate(optional<float> zoom, const Feature& feature, optional<double> colorRampParameter) const {
+EvaluationResult Expression::evaluate(optional<float> zoom,
+                                      const Feature& feature,
+                                      optional<double> colorRampParameter) const {
     GeoJSONFeature f(feature);
     return this->evaluate(EvaluationContext(zoom, &f, colorRampParameter));
+}
+
+EvaluationResult Expression::evaluate(optional<float> zoom,
+                                      const Feature& feature,
+                                      optional<double> colorRampParameter,
+                                      const std::set<std::string>& availableImages) const {
+    GeoJSONFeature f(feature);
+    return this->evaluate(EvaluationContext(zoom, &f, colorRampParameter).withAvailableImages(&availableImages));
+}
+
+EvaluationResult Expression::evaluate(optional<mbgl::Value> accumulated, const Feature& feature) const {
+    GeoJSONFeature f(feature);
+    return this->evaluate(EvaluationContext(accumulated, &f));
 }
 
 } // namespace expression

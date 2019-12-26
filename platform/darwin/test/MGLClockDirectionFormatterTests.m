@@ -1,8 +1,6 @@
 #import <Mapbox/Mapbox.h>
 #import <XCTest/XCTest.h>
 
-static NSString * const MGLTestLocaleIdentifier = @"en-US";
-
 @interface MGLClockDirectionFormatterTests : XCTestCase
 
 @end

@@ -6,7 +6,7 @@
 #include <mbgl/map/map_options.hpp>
 #include <mbgl/gfx/backend_scope.hpp>
 #include <mbgl/gl/defines.hpp>
-#include <mbgl/gl/headless_frontend.hpp>
+#include <mbgl/gfx/headless_frontend.hpp>
 #include <mbgl/gl/renderable_resource.hpp>
 #include <mbgl/storage/resource_options.hpp>
 #include <mbgl/style/style.hpp>
@@ -85,11 +85,16 @@ struct Buffer {
 };
 
 TEST(GLContextMode, Shared) {
+    if (gfx::Backend::GetType() != gfx::Backend::Type::OpenGL) {
+        return;
+    }
+
     util::RunLoop loop;
 
-    HeadlessFrontend frontend { 1, {}, gfx::ContextMode::Shared };
+    HeadlessFrontend frontend{1, gfx::HeadlessBackend::SwapBehaviour::NoFlush, gfx::ContextMode::Shared};
 
-    Map map(frontend, MapObserver::nullObserver(),
+    Map map(frontend,
+            MapObserver::nullObserver(),
             MapOptions().withMapMode(MapMode::Static).withSize(frontend.getSize()),
             ResourceOptions().withCachePath(":memory:").withAssetPath("test/fixtures/api/assets"));
     map.getStyle().loadJSON(util::read_file("test/fixtures/api/water.json"));
@@ -114,5 +119,5 @@ TEST(GLContextMode, Shared) {
         MBGL_CHECK_ERROR(glDrawArrays(GL_TRIANGLE_STRIP, 0, 3));
     }
 
-    test::checkImage("test/fixtures/shared_context", frontend.render(map), 0.5, 0.1);
+    test::checkImage("test/fixtures/shared_context", frontend.render(map).image, 0.5, 0.1);
 }

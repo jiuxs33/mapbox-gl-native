@@ -9,6 +9,7 @@ using namespace mbgl;
 
 TEST(Transform, InvalidZoom) {
     Transform transform;
+    transform.resize({1, 1});
 
     ASSERT_DOUBLE_EQ(0, transform.getLatLng().latitude());
     ASSERT_DOUBLE_EQ(0, transform.getLatLng().longitude());
@@ -56,6 +57,7 @@ TEST(Transform, InvalidZoom) {
 
 TEST(Transform, InvalidBearing) {
     Transform transform;
+    transform.resize({1, 1});
 
     ASSERT_DOUBLE_EQ(0, transform.getLatLng().latitude());
     ASSERT_DOUBLE_EQ(0, transform.getLatLng().longitude());
@@ -78,6 +80,7 @@ TEST(Transform, InvalidBearing) {
 
 TEST(Transform, IntegerZoom) {
     Transform transform;
+    transform.resize({1, 1});
 
     auto checkIntegerZoom = [&transform](uint8_t zoomInt, double zoom) {
         transform.jumpTo(CameraOptions().withZoom(zoom));
@@ -288,25 +291,48 @@ TEST(Transform, Padding) {
 
     ASSERT_DOUBLE_EQ(0, transform.getLatLng().latitude());
     ASSERT_DOUBLE_EQ(0, transform.getLatLng().longitude());
-
-    transform.jumpTo(CameraOptions().withCenter(LatLng { 10, -100 }).withZoom(10.0));
+    CameraOptions nonPaddedCameraOptions = CameraOptions().withCenter(LatLng { 10, -100 }).withZoom(10.0);
+    transform.jumpTo(nonPaddedCameraOptions);
 
     const LatLng trueCenter = transform.getLatLng();
     ASSERT_DOUBLE_EQ(10, trueCenter.latitude());
     ASSERT_DOUBLE_EQ(-100, trueCenter.longitude());
     ASSERT_DOUBLE_EQ(10, transform.getZoom());
 
-    const LatLng manualShiftedCenter = transform.getState().screenCoordinateToLatLng({
+    const LatLng screenCenter = transform.screenCoordinateToLatLng({
         1000.0 / 2.0,
-        1000.0 / 4.0,
+        1000.0 / 2.0,
+    });
+    const LatLng upperHalfCenter = transform.screenCoordinateToLatLng({
+        1000.0 / 2.0,
+        1000.0 * 0.25,
     });
 
     EdgeInsets padding(1000.0 / 2.0, 0, 0, 0);
-    const LatLng shiftedCenter = transform.getLatLng(padding);
-    ASSERT_NE(trueCenter.latitude(), shiftedCenter.latitude());
-    ASSERT_NEAR(trueCenter.longitude(), shiftedCenter.longitude(), 1e-8);
-    ASSERT_DOUBLE_EQ(manualShiftedCenter.latitude(), shiftedCenter.latitude());
-    ASSERT_DOUBLE_EQ(manualShiftedCenter.longitude(), shiftedCenter.longitude());
+    // CameraOption center and zoom don't change when padding changes: center of
+    // viewport remains the same as padding defines viwport center offset in rendering.
+    CameraOptions paddedOptions = CameraOptions().withPadding(padding);
+    transform.jumpTo(paddedOptions);
+    const LatLng theSameCenter = transform.getLatLng();
+    ASSERT_DOUBLE_EQ(trueCenter.latitude(), theSameCenter.latitude());
+    ASSERT_DOUBLE_EQ(trueCenter.longitude(), theSameCenter.longitude());
+
+    // However, LatLng is now at the center of lower half - verify conversion
+    // from screen coordinate to LatLng.
+    const LatLng paddedLowerHalfScreenCenter = transform.screenCoordinateToLatLng({
+        1000.0 / 2.0,
+        1000.0 * 0.75,
+    });
+    ASSERT_NEAR(screenCenter.latitude(), paddedLowerHalfScreenCenter.latitude(), 1e-10);
+    ASSERT_NEAR(screenCenter.longitude(), paddedLowerHalfScreenCenter.longitude(), 1e-10);
+
+    // LatLng previously in upper half center, should now be under screen center.
+    const LatLng paddedScreenCenter = transform.screenCoordinateToLatLng({
+        1000.0 / 2.0,
+        1000.0 / 2.0,
+    });
+    ASSERT_NEAR(upperHalfCenter.latitude(), paddedScreenCenter.latitude(), 1e-10);
+    ASSERT_NEAR(upperHalfCenter.longitude(), paddedScreenCenter.longitude(), 1e-10);
 }
 
 TEST(Transform, MoveBy) {
@@ -440,7 +466,7 @@ TEST(Transform, Camera) {
     flyOptions.transitionFrameFn = [&](double t) {
         ASSERT_TRUE(t >= 0 && t <= 1);
         ASSERT_LE(latLng2.latitude(), transform.getLatLng().latitude());
-        ASSERT_GE(latLng2.longitude(), transform.getLatLng({}, LatLng::Unwrapped).longitude());
+        ASSERT_GE(latLng2.longitude(), transform.getLatLng(LatLng::Unwrapped).longitude());
     };
     flyOptions.transitionFinishFn = [&]() {
         // XXX Fix precision loss in flyTo:
@@ -583,7 +609,7 @@ TEST(Transform, LatLngBounds) {
     transform.jumpTo(CameraOptions().withCenter(LatLng()).withZoom(transform.getState().getMaxZoom()));
 
     // Default bounds.
-    ASSERT_EQ(transform.getState().getLatLngBounds(), LatLngBounds::unbounded());
+    ASSERT_EQ(transform.getState().getLatLngBounds(), LatLngBounds());
     ASSERT_EQ(transform.getLatLng(), nullIsland);
 
     // Invalid bounds.
@@ -591,7 +617,7 @@ TEST(Transform, LatLngBounds) {
         transform.setLatLngBounds(LatLngBounds::empty());
         ASSERT_TRUE(false) << "Should throw";
     } catch (...) {
-        ASSERT_EQ(transform.getState().getLatLngBounds(), LatLngBounds::unbounded());
+        ASSERT_EQ(transform.getState().getLatLngBounds(), LatLngBounds());
     }
 
     transform.jumpTo(CameraOptions().withCenter(sanFrancisco));
@@ -618,7 +644,7 @@ TEST(Transform, LatLngBounds) {
 
     // Try crossing the antimeridian from the right.
     transform.jumpTo(CameraOptions().withCenter(LatLng { 0.0, 200.0 }));
-    ASSERT_DOUBLE_EQ(transform.getLatLng({}, LatLng::Unwrapped).longitude(), 180.0);
+    ASSERT_DOUBLE_EQ(transform.getLatLng(LatLng::Unwrapped).longitude(), 180.0);
     ASSERT_DOUBLE_EQ(transform.getLatLng().longitude(), -180.0);
 
     //    -1   |   0   |  +1

@@ -21,6 +21,13 @@
 
 #include <set>
 
+namespace {
+
+const size_t kResourcesBatchSize = 64;
+const size_t kMarkBatchSize = 200;
+
+} // namespace
+
 namespace mbgl {
 
 using namespace style;
@@ -144,8 +151,9 @@ OfflineRegionStatus OfflineDownload::getStatus() const {
 
         auto handleTiledSource = [&] (const variant<std::string, Tileset>& urlOrTileset, const uint16_t tileSize) {
             if (urlOrTileset.is<Tileset>()) {
-                result->requiredResourceCount +=
-                        tileCount(definition, type, tileSize, urlOrTileset.get<Tileset>().zoomRange);
+                uint64_t tileSourceCount = tileCount(definition, type, tileSize, urlOrTileset.get<Tileset>().zoomRange);
+                result->requiredTileCount += tileSourceCount;
+                result->requiredResourceCount += tileSourceCount;
             } else {
                 result->requiredResourceCount += 1;
                 const auto& url = urlOrTileset.get<std::string>();
@@ -154,8 +162,9 @@ OfflineRegionStatus OfflineDownload::getStatus() const {
                     style::conversion::Error error;
                     optional<Tileset> tileset = style::conversion::convertJSON<Tileset>(*sourceResponse->data, error);
                     if (tileset) {
-                        result->requiredResourceCount +=
-                                tileCount(definition, type, tileSize, (*tileset).zoomRange);
+                        uint64_t tileSourceCount = tileCount(definition, type, tileSize, (*tileset).zoomRange);
+                        result->requiredTileCount += tileSourceCount;
+                        result->requiredResourceCount += tileSourceCount;
                     }
                 } else {
                     result->requiredResourceCountIsPrecise = false;
@@ -223,8 +232,12 @@ void OfflineDownload::activateDownload() {
     status = OfflineRegionStatus();
     status.downloadState = OfflineRegionDownloadState::Active;
     status.requiredResourceCount++;
-    ensureResource(Resource::style(definition.match([](auto& reg){ return reg.styleURL; }), Resource::Priority::Low),
-                   [&](Response styleResponse) {
+
+    auto styleResource = Resource::style(definition.match([](auto& reg){ return reg.styleURL; }));
+    styleResource.setPriority(Resource::Priority::Low);
+    styleResource.setUsage(Resource::Usage::Offline);
+
+    ensureResource(std::move(styleResource), [&](Response styleResponse) {
         status.requiredResourceCountIsPrecise = true;
 
         style::Parser parser;
@@ -242,7 +255,11 @@ void OfflineDownload::activateDownload() {
                     status.requiredResourceCount++;
                     requiredSourceURLs.insert(url);
 
-                    ensureResource(Resource::source(url, Resource::Priority::Low), [=](Response sourceResponse) {
+                    auto sourceResource = Resource::source(url);
+                    sourceResource.setPriority(Resource::Priority::Low);
+                    sourceResource.setUsage(Resource::Usage::Offline);
+
+                    ensureResource(std::move(sourceResource), [=](Response sourceResponse) {
                         style::conversion::Error error;
                         optional<Tileset> tileset = style::conversion::convertJSON<Tileset>(*sourceResponse.data, error);
                         if (tileset) {
@@ -345,12 +362,15 @@ void OfflineDownload::activateDownload() {
 */
 void OfflineDownload::continueDownload() {
     if (resourcesRemaining.empty() && status.complete()) {
+        markPendingUsedResources();
         setState(OfflineRegionDownloadState::Inactive);
         return;
     }
 
+    if (resourcesToBeMarkedAsUsed.size() >= kMarkBatchSize) markPendingUsedResources();
+
     while (!resourcesRemaining.empty() && requests.size() < onlineFileSource.getMaximumConcurrentRequests()) {
-        ensureResource(resourcesRemaining.front());
+        ensureResource(std::move(resourcesRemaining.front()));
         resourcesRemaining.pop_front();
     }
 }
@@ -359,48 +379,71 @@ void OfflineDownload::deactivateDownload() {
     requiredSourceURLs.clear();
     resourcesRemaining.clear();
     requests.clear();
+    buffer.clear();
 }
 
-void OfflineDownload::queueResource(Resource resource) {
+void OfflineDownload::queueResource(Resource&& resource) {
     resource.setPriority(Resource::Priority::Low);
+    resource.setUsage(Resource::Usage::Offline);
     status.requiredResourceCount++;
+    if (resource.kind == mbgl::Resource::Kind::Tile) {
+        status.requiredTileCount++;
+    }
     resourcesRemaining.push_front(std::move(resource));
 }
 
 void OfflineDownload::queueTiles(SourceType type, uint16_t tileSize, const Tileset& tileset) {
     tileCover(definition, type, tileSize, tileset.zoomRange, [&](const auto& tile) {
         status.requiredResourceCount++;
-        resourcesRemaining.push_back(Resource::tile(
-            tileset.tiles[0], definition.match([](auto& def) { return def.pixelRatio; }), tile.x,
-            tile.y, tile.z, tileset.scheme, Resource::Priority::Low));
+        status.requiredTileCount++;
+
+        auto tileResource = Resource::tile(
+                tileset.tiles[0], definition.match([](auto& def) { return def.pixelRatio; }),
+                tile.x, tile.y, tile.z, tileset.scheme);
+
+        tileResource.setPriority(Resource::Priority::Low);
+        tileResource.setUsage(Resource::Usage::Offline);
+
+        resourcesRemaining.push_back(std::move(tileResource));
     });
 }
 
-void OfflineDownload::ensureResource(const Resource& resource,
+void OfflineDownload::markPendingUsedResources() {
+    offlineDatabase.markUsedResources(id, resourcesToBeMarkedAsUsed);
+    resourcesToBeMarkedAsUsed.clear();
+}
+
+void OfflineDownload::ensureResource(Resource&& resource,
                                      std::function<void(Response)> callback) {
     assert(resource.priority == Resource::Priority::Low);
+    assert(resource.usage == Resource::Usage::Offline);
 
     auto workRequestsIt = requests.insert(requests.begin(), nullptr);
     *workRequestsIt = util::RunLoop::Get()->invokeCancellable([=]() {
         requests.erase(workRequestsIt);
-
+        const auto resourceKind = resource.kind;
         auto getResourceSizeInDatabase = [&] () -> optional<int64_t> {
+            optional<int64_t> result;
             if (!callback) {
-                return offlineDatabase.hasRegionResource(id, resource);
+                result = offlineDatabase.hasRegionResource(resource);
+            } else {
+                optional<std::pair<Response, uint64_t>> response = offlineDatabase.getRegionResource(resource);
+                if (response) {
+                    callback(response->first);
+                    result = response->second;
+                }
             }
-            optional<std::pair<Response, uint64_t>> response = offlineDatabase.getRegionResource(id, resource);
-            if (!response) {
-                return {};
-            }
-            callback(response->first);
-            return response->second;
+
+            if (result) resourcesToBeMarkedAsUsed.emplace_back(resource);
+            return result;
         };
 
         optional<int64_t> offlineResponse = getResourceSizeInDatabase();
         if (offlineResponse) {
+            assert(!resourcesToBeMarkedAsUsed.empty());
             status.completedResourceCount++;
             status.completedResourceSize += *offlineResponse;
-            if (resource.kind == Resource::Kind::Tile) {
+            if (resourceKind == Resource::Kind::Tile) {
                 status.completedTileCount += 1;
                 status.completedTileSize += *offlineResponse;
             }
@@ -432,7 +475,7 @@ void OfflineDownload::ensureResource(const Resource& resource,
             buffer.emplace_back(resource, onlineResponse);
 
             // Flush buffer periodically
-            if (buffer.size() == 64 || resourcesRemaining.size() == 0) {
+            if (buffer.size() == kResourcesBatchSize || resourcesRemaining.empty()) {
                 try {
                     offlineDatabase.putRegionResources(id, buffer, status);
                 } catch (const MapboxTileLimitExceededException&) {

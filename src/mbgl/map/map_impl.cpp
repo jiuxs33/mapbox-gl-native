@@ -130,11 +130,11 @@ void Map::Impl::onWillStartRenderingFrame() {
     }
 }
 
-void Map::Impl::onDidFinishRenderingFrame(RenderMode renderMode, bool needsRepaint) {
+void Map::Impl::onDidFinishRenderingFrame(RenderMode renderMode, bool needsRepaint, bool placemenChanged) {
     rendererFullyLoaded = renderMode == RenderMode::Full;
 
     if (mode == MapMode::Continuous) {
-        observer.onDidFinishRenderingFrame(MapObserver::RenderMode(renderMode));
+        observer.onDidFinishRenderingFrame({MapObserver::RenderMode(renderMode), needsRepaint, placemenChanged});
 
         if (needsRepaint || transform.inTransition()) {
             onUpdate();
@@ -177,6 +177,14 @@ void Map::Impl::onStyleImageMissing(const std::string& id, std::function<void()>
 
     done();
     onUpdate();
+}
+
+void Map::Impl::onRemoveUnusedStyleImages(const std::vector<std::string>& unusedImageIDs) {
+    for (const auto& unusedImageID : unusedImageIDs) {
+        if (observer.onCanRemoveUnusedStyleImage(unusedImageID)) {
+            style->removeImage(unusedImageID);
+        }
+    }
 }
 
 } // namespace mbgl

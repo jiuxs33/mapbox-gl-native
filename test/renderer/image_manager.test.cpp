@@ -28,51 +28,10 @@ TEST(ImageManager, Basic) {
                               util::read_file("test/fixtures/annotations/emerald.json"));
     for (auto& image : images) {
         imageManager.addImage(image->baseImpl);
+        auto* stored = imageManager.getImage(image->getID());
+        ASSERT_TRUE(stored);
+        EXPECT_EQ(image->getImage().size, stored->image.size);
     }
-
-    auto metro = *imageManager.getPattern("metro");
-    EXPECT_EQ(1, metro.tl()[0]);
-    EXPECT_EQ(1, metro.tl()[1]);
-    EXPECT_EQ(19, metro.br()[0]);
-    EXPECT_EQ(19, metro.br()[1]);
-    EXPECT_EQ(18, metro.displaySize()[0]);
-    EXPECT_EQ(18, metro.displaySize()[1]);
-    EXPECT_EQ(1.0f, metro.pixelRatio);
-    EXPECT_EQ(imageManager.getPixelSize(), imageManager.getAtlasImage().size);
-
-    test::checkImage("test/fixtures/image_manager/basic", imageManager.getAtlasImage());
-}
-
-TEST(ImageManager, Updates) {
-    ImageManager imageManager;
-
-    PremultipliedImage imageA({ 16, 12 });
-    imageA.fill(255);
-    imageManager.addImage(makeMutable<style::Image::Impl>("one", std::move(imageA), 1));
-
-    auto a = *imageManager.getPattern("one");
-    EXPECT_EQ(1, a.tl()[0]);
-    EXPECT_EQ(1, a.tl()[1]);
-    EXPECT_EQ(17, a.br()[0]);
-    EXPECT_EQ(13, a.br()[1]);
-    EXPECT_EQ(16, a.displaySize()[0]);
-    EXPECT_EQ(12, a.displaySize()[1]);
-    EXPECT_EQ(1.0f, a.pixelRatio);
-    test::checkImage("test/fixtures/image_manager/updates_before", imageManager.getAtlasImage());
-
-    PremultipliedImage imageB({ 5, 5 });
-    imageA.fill(200);
-    imageManager.updateImage(makeMutable<style::Image::Impl>("one", std::move(imageB), 1));
-
-    auto b = *imageManager.getPattern("one");
-    EXPECT_EQ(1, b.tl()[0]);
-    EXPECT_EQ(1, b.tl()[1]);
-    EXPECT_EQ(6, b.br()[0]);
-    EXPECT_EQ(6, b.br()[1]);
-    EXPECT_EQ(5, b.displaySize()[0]);
-    EXPECT_EQ(5, b.displaySize()[1]);
-    EXPECT_EQ(1.0f, b.pixelRatio);
-    test::checkImage("test/fixtures/image_manager/updates_after", imageManager.getAtlasImage());
 }
 
 TEST(ImageManager, AddRemove) {
@@ -91,6 +50,18 @@ TEST(ImageManager, AddRemove) {
     EXPECT_EQ(nullptr, imageManager.getImage("four"));
 }
 
+TEST(ImageManager, Update) {
+    FixtureLog log;
+    ImageManager imageManager;
+
+    imageManager.addImage(makeMutable<style::Image::Impl>("one", PremultipliedImage({ 16, 16 }), 2));
+    EXPECT_EQ(0, imageManager.updatedImageVersions.size());
+    imageManager.updateImage(makeMutable<style::Image::Impl>("one", PremultipliedImage({ 16, 16 }), 2));
+    EXPECT_EQ(1, imageManager.updatedImageVersions.size());
+    imageManager.removeImage("one");
+    EXPECT_EQ(0, imageManager.updatedImageVersions.size());
+}
+
 TEST(ImageManager, RemoveReleasesBinPackRect) {
     FixtureLog log;
     ImageManager imageManager;
@@ -107,7 +78,7 @@ TEST(ImageManager, RemoveReleasesBinPackRect) {
 
 class StubImageRequestor : public ImageRequestor {
 public:
-    StubImageRequestor(ImageManager& imageManager) : ImageRequestor(imageManager) {}
+    StubImageRequestor(ImageManager& imageManager_) : ImageRequestor(imageManager_) {}
 
     void onImagesAvailable(ImageMap icons, ImageMap patterns, std::unordered_map<std::string, uint32_t> versionMap, uint64_t imageCorrelationID_) final {
         if (imagesAvailable && imageCorrelationID == imageCorrelationID_) imagesAvailable(icons, patterns, versionMap);
@@ -169,10 +140,15 @@ class StubImageManagerObserver : public ImageManagerObserver {
     public:
     int count = 0;
     std::function<void (const std::string&)> imageMissing = [](const std::string&){};
-    virtual void onStyleImageMissing(const std::string& id, std::function<void()> done) override {
+    void onStyleImageMissing(const std::string& id, std::function<void()> done) override {
         count++;
         imageMissing(id);
         done();
+    }
+
+    std::function<void (const std::vector<std::string>&)> removeUnusedStyleImages = [](const std::vector<std::string>&){};
+    void onRemoveUnusedStyleImages(const std::vector<std::string>& unusedImageIDs) override {
+        removeUnusedStyleImages(unusedImageIDs);
     }
 };
 
@@ -211,6 +187,24 @@ TEST(ImageManager, OnStyleImageMissingBeforeSpriteLoaded) {
     EXPECT_EQ(observer.count, 1);
     ASSERT_TRUE(notified);
 
+    // Request for updated dependencies must be dispatched to the
+    // observer.
+    dependencies.emplace("post", ImageType::Icon);
+    imageManager.getImages(requestor, std::make_pair(dependencies, ++imageCorrelationID));
+    ASSERT_TRUE(requestor.hasPendingRequests());
+
+    runLoop.runOnce();
+    ASSERT_FALSE(requestor.hasPendingRequests());
+
+    // Another requestor shall not have pending requests for already obtained images.
+    StubImageRequestor anotherRequestor(imageManager);
+    imageManager.getImages(anotherRequestor, std::make_pair(dependencies, ++imageCorrelationID));
+    ASSERT_FALSE(anotherRequestor.hasPendingRequests());
+
+    dependencies.emplace("unfamiliar", ImageType::Icon);
+    imageManager.getImages(anotherRequestor, std::make_pair(dependencies, ++imageCorrelationID));
+    EXPECT_TRUE(anotherRequestor.hasPendingRequests());
+    EXPECT_TRUE(anotherRequestor.hasPendingRequest("unfamiliar"));
 }
 
 TEST(ImageManager, OnStyleImageMissingAfterSpriteLoaded) {
@@ -249,18 +243,30 @@ TEST(ImageManager, OnStyleImageMissingAfterSpriteLoaded) {
     ASSERT_TRUE(notified);
 }
 
-TEST(ImageManager, ReduceMemoryUsage) {
+TEST(ImageManager, RemoveUnusedStyleImages) {
     util::RunLoop runLoop;
     ImageManager imageManager;
     StubImageManagerObserver observer;
-
-    observer.imageMissing = [&imageManager] (const std::string& id) {
-        imageManager.addImage(makeMutable<style::Image::Impl>(id, PremultipliedImage({ 16, 16 }), 1));
-    };
-
     imageManager.setObserver(&observer);
     imageManager.setLoaded(true);
-    runLoop.runOnce();
+
+    observer.imageMissing = [&imageManager] (const std::string& id) {
+        if (id == "1024px") {
+            imageManager.addImage(makeMutable<style::Image::Impl>(id, PremultipliedImage({ 1024, 1024 }), 1));
+        } else {
+            imageManager.addImage(makeMutable<style::Image::Impl>(id, PremultipliedImage({ 16, 16 }), 1));
+        }
+    };
+
+    observer.removeUnusedStyleImages = [&imageManager](const std::vector<std::string>& ids) {
+        for (const auto& id : ids) {
+            assert(imageManager.getImage(id));
+            imageManager.removeImage(id);
+        }
+    };
+
+    // Style sprite.
+    imageManager.addImage(makeMutable<style::Image::Impl>("sprite", PremultipliedImage({ 16, 16 }), 1));
 
     // Single requestor
     {
@@ -271,10 +277,31 @@ TEST(ImageManager, ReduceMemoryUsage) {
         ASSERT_FALSE(imageManager.getImage("missing") == nullptr);
     }
 
-    // Reduce memory usage and check that unused image was deleted.
+    // Within cache limits, no need to notify client.
+    imageManager.reduceMemoryUseIfCacheSizeExceedsLimit();
+    runLoop.runOnce();
+    ASSERT_FALSE(imageManager.getImage("missing") == nullptr);
+
+    // Simulate OOM case, forces client notification to be issued.
     imageManager.reduceMemoryUse();
     runLoop.runOnce();
     ASSERT_TRUE(imageManager.getImage("missing") == nullptr);
+    ASSERT_FALSE(imageManager.getImage("sprite") == nullptr);
+
+    // Single requestor, exceed cache size limit.
+    {
+        std::unique_ptr<StubImageRequestor> requestor = std::make_unique<StubImageRequestor>(imageManager);
+        imageManager.getImages(*requestor, std::make_pair(ImageDependencies{{"1024px", ImageType::Icon}}, 0ull));
+        runLoop.runOnce();
+        EXPECT_EQ(observer.count, 2);
+        ASSERT_FALSE(imageManager.getImage("1024px") == nullptr);
+    }
+
+    // Over cache limits, need to notify client.
+    imageManager.reduceMemoryUseIfCacheSizeExceedsLimit();
+    runLoop.runOnce();
+    ASSERT_TRUE(imageManager.getImage("1024px") == nullptr);
+    ASSERT_FALSE(imageManager.getImage("sprite") == nullptr);
 
     // Multiple requestors
     {
@@ -283,11 +310,14 @@ TEST(ImageManager, ReduceMemoryUsage) {
         imageManager.getImages(*requestor1, std::make_pair(ImageDependencies{{"missing", ImageType::Icon}}, 0ull));
         imageManager.getImages(*requestor2, std::make_pair(ImageDependencies{{"missing", ImageType::Icon}}, 1ull));
         runLoop.runOnce();
-        EXPECT_EQ(observer.count, 2);
+        EXPECT_EQ(observer.count, 3);
         ASSERT_FALSE(imageManager.getImage("missing") == nullptr);
     }
 
     // Reduce memory usage and check that unused image was deleted when all requestors are destructed.
+    imageManager.reduceMemoryUseIfCacheSizeExceedsLimit();
+    runLoop.runOnce();
+    ASSERT_FALSE(imageManager.getImage("missing") == nullptr);
     imageManager.reduceMemoryUse();
     runLoop.runOnce();
     ASSERT_TRUE(imageManager.getImage("missing") == nullptr);
@@ -296,21 +326,25 @@ TEST(ImageManager, ReduceMemoryUsage) {
     std::unique_ptr<StubImageRequestor> requestor = std::make_unique<StubImageRequestor>(imageManager);
     {
         std::unique_ptr<StubImageRequestor> requestor1 = std::make_unique<StubImageRequestor>(imageManager);
-        imageManager.getImages(*requestor, std::make_pair(ImageDependencies{{"missing", ImageType::Icon}}, 0ull));
+        imageManager.getImages(*requestor, std::make_pair(ImageDependencies{{"missing", ImageType::Icon}, {"1024px", ImageType::Icon}}, 0ull));
         imageManager.getImages(*requestor1, std::make_pair(ImageDependencies{{"missing", ImageType::Icon}}, 1ull));
         runLoop.runOnce();
-        EXPECT_EQ(observer.count, 3);
+        EXPECT_EQ(observer.count, 5);
         ASSERT_FALSE(imageManager.getImage("missing") == nullptr);
+        ASSERT_FALSE(imageManager.getImage("1024px") == nullptr);
     }
 
     // Reduce memory usage and check that requested image is not destructed.
-    imageManager.reduceMemoryUse();
+    imageManager.reduceMemoryUseIfCacheSizeExceedsLimit();
     runLoop.runOnce();
     ASSERT_FALSE(imageManager.getImage("missing") == nullptr);
+    ASSERT_FALSE(imageManager.getImage("1024px") == nullptr);
 
-    // Release last requestor and check if resource was released after reduceMemoryUse().
+    // Release last requestor and check if resource was released when cache size is over the limit.
     requestor.reset();
-    imageManager.reduceMemoryUse();
+    imageManager.reduceMemoryUseIfCacheSizeExceedsLimit();
     runLoop.runOnce();
     ASSERT_TRUE(imageManager.getImage("missing") == nullptr);
+    ASSERT_TRUE(imageManager.getImage("1024px") == nullptr);
+    ASSERT_FALSE(imageManager.getImage("sprite") == nullptr);
 }

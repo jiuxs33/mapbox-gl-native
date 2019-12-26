@@ -9,7 +9,6 @@
 #include <mbgl/gl/command_encoder.hpp>
 #include <mbgl/gl/debugging_extension.hpp>
 #include <mbgl/gl/vertex_array_extension.hpp>
-#include <mbgl/gl/program_binary_extension.hpp>
 #include <mbgl/util/traits.hpp>
 #include <mbgl/util/std.hpp>
 #include <mbgl/util/logging.hpp>
@@ -50,20 +49,20 @@ static_assert(underlying_type(UniformDataType::FloatMat4) == GL_FLOAT_MAT4, "Ope
 static_assert(underlying_type(UniformDataType::Sampler2D) == GL_SAMPLER_2D, "OpenGL type mismatch");
 static_assert(underlying_type(UniformDataType::SamplerCube) == GL_SAMPLER_CUBE, "OpenGL type mismatch");
 
-static_assert(std::is_same<BinaryProgramFormat, GLenum>::value, "OpenGL type mismatch");
-
 Context::Context(RendererBackend& backend_)
-    : gfx::Context(gfx::ContextType::OpenGL, [] {
+    : gfx::Context([] {
           GLint value;
           MBGL_CHECK_ERROR(glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &value));
           return value;
-      }()), backend(backend_) {
-}
+      }()),
+      backend(backend_),
+      stats() {}
 
 Context::~Context() {
     if (cleanupOnDestruction) {
         reset();
     }
+    assert(stats.isZero());
 }
 
 void Context::initializeExtensions(const std::function<gl::ProcAddress(const char*)>& getProcAddress) {
@@ -95,21 +94,17 @@ void Context::initializeExtensions(const std::function<gl::ProcAddress(const cha
         }
 
         // Block Adreno 2xx, 3xx as it crashes on glBuffer(Sub)Data
+        // Block Adreno 4xx as it crashes in a driver when VBOs are destructed (Android 5.1.1)
         // Block ARM Mali-T720 (in some MT8163 chipsets) as it crashes on glBindVertexArray
         // Block ANGLE on Direct3D as the combination of Qt + Windows + ANGLE leads to crashes
-        if (renderer.find("Adreno (TM) 2") == std::string::npos
-            && renderer.find("Adreno (TM) 3") == std::string::npos
-            && (!(renderer.find("ANGLE") != std::string::npos
-                  && renderer.find("Direct3D") != std::string::npos))
-            && renderer.find("Mali-T720") == std::string::npos
-            && renderer.find("Sapphire 650") == std::string::npos
-            && !disableVAOExtension) {
-                vertexArray = std::make_unique<extension::VertexArray>(fn);
+        if (renderer.find("Adreno (TM) 2") == std::string::npos &&
+            renderer.find("Adreno (TM) 3") == std::string::npos &&
+            renderer.find("Adreno (TM) 4") == std::string::npos &&
+            (!(renderer.find("ANGLE") != std::string::npos && renderer.find("Direct3D") != std::string::npos)) &&
+            renderer.find("Mali-T720") == std::string::npos && renderer.find("Sapphire 650") == std::string::npos &&
+            !disableVAOExtension) {
+            vertexArray = std::make_unique<extension::VertexArray>(fn);
         }
-
-#if MBGL_HAS_BINARY_PROGRAMS
-        programBinary = std::make_unique<extension::ProgramBinary>(fn);
-#endif
 
 #if MBGL_USE_GLES2
         constexpr const char* halfFloatExtensionName = "OES_texture_half_float";
@@ -186,23 +181,6 @@ UniqueProgram Context::createProgram(ShaderID vertexShader, ShaderID fragmentSha
     return result;
 }
 
-#if MBGL_HAS_BINARY_PROGRAMS
-UniqueProgram Context::createProgram(BinaryProgramFormat binaryFormat,
-                                     const std::string& binaryProgram) {
-    assert(supportsProgramBinaries());
-    UniqueProgram result{ MBGL_CHECK_ERROR(glCreateProgram()), { this } };
-    MBGL_CHECK_ERROR(programBinary->programBinary(result, static_cast<GLenum>(binaryFormat),
-                                                  binaryProgram.data(),
-                                                  static_cast<GLint>(binaryProgram.size())));
-    verifyProgramLinkage(result);
-    return result;
-}
-#else
-UniqueProgram Context::createProgram(BinaryProgramFormat, const std::string&) {
-    throw std::runtime_error("binary programs are not supported");
-}
-#endif
-
 void Context::linkProgram(ProgramID program_) {
     MBGL_CHECK_ERROR(glLinkProgram(program_));
     verifyProgramLinkage(program_);
@@ -230,11 +208,14 @@ UniqueTexture Context::createUniqueTexture() {
     if (pooledTextures.empty()) {
         pooledTextures.resize(TextureMax);
         MBGL_CHECK_ERROR(glGenTextures(TextureMax, pooledTextures.data()));
+        stats.numCreatedTextures += TextureMax;
     }
 
     TextureID id = pooledTextures.back();
     pooledTextures.pop_back();
-    return UniqueTexture{ std::move(id), { this } };
+    stats.numActiveTextures++;
+    // NOLINTNEXTLINE(performance-move-const-arg)
+    return UniqueTexture{std::move(id), {this}};
 }
 
 bool Context::supportsVertexArrays() const {
@@ -244,55 +225,11 @@ bool Context::supportsVertexArrays() const {
            vertexArray->deleteVertexArrays;
 }
 
-#if MBGL_HAS_BINARY_PROGRAMS
-bool Context::supportsProgramBinaries() const {
-    if (!programBinary || !programBinary->programBinary || !programBinary->getProgramBinary) {
-        return false;
-    }
-
-    // Blacklist Adreno 3xx, 4xx, and 5xx GPUs due to known bugs:
-    // https://bugs.chromium.org/p/chromium/issues/detail?id=510637
-    // https://chromium.googlesource.com/chromium/src/gpu/+/master/config/gpu_driver_bug_list.json#2316
-    // Blacklist Vivante GC4000 due to bugs when linking loaded programs:
-    // https://github.com/mapbox/mapbox-gl-native/issues/10704
-    const std::string renderer = reinterpret_cast<const char*>(MBGL_CHECK_ERROR(glGetString(GL_RENDERER)));
-    if (renderer.find("Adreno (TM) 3") != std::string::npos
-     || renderer.find("Adreno (TM) 4") != std::string::npos
-     || renderer.find("Adreno (TM) 5") != std::string::npos
-     || renderer.find("Vivante GC4000") != std::string::npos) {
-        return false;
-    }
-
-    return true;
-}
-
-optional<std::pair<BinaryProgramFormat, std::string>>
-Context::getBinaryProgram(ProgramID program_) const {
-    if (!supportsProgramBinaries()) {
-        return {};
-    }
-    GLint binaryLength;
-    MBGL_CHECK_ERROR(glGetProgramiv(program_, GL_PROGRAM_BINARY_LENGTH, &binaryLength));
-    std::string binary;
-    binary.resize(binaryLength);
-    GLenum binaryFormat;
-    MBGL_CHECK_ERROR(programBinary->getProgramBinary(
-        program_, binaryLength, &binaryLength, &binaryFormat, const_cast<char*>(binary.data())));
-    if (size_t(binaryLength) != binary.size()) {
-        return {};
-    }
-    return { { binaryFormat, std::move(binary) } };
-}
-#else
-optional<std::pair<BinaryProgramFormat, std::string>> Context::getBinaryProgram(ProgramID) const {
-    return {};
-}
-#endif
-
 VertexArray Context::createVertexArray() {
     if (supportsVertexArrays()) {
         VertexArrayID id = 0;
         MBGL_CHECK_ERROR(vertexArray->genVertexArrays(1, &id));
+        // NOLINTNEXTLINE(performance-move-const-arg)
         UniqueVertexArray vao(std::move(id), { this });
         return { UniqueVertexArrayState(new VertexArrayState(std::move(vao)), VertexArrayStateDeleter { true })};
     } else {
@@ -305,14 +242,18 @@ VertexArray Context::createVertexArray() {
 UniqueFramebuffer Context::createFramebuffer() {
     FramebufferID id = 0;
     MBGL_CHECK_ERROR(glGenFramebuffers(1, &id));
+    stats.numFrameBuffers++;
+    // NOLINTNEXTLINE(performance-move-const-arg)
     return UniqueFramebuffer{ std::move(id), { this } };
 }
 
 std::unique_ptr<gfx::TextureResource> Context::createTextureResource(
     const Size size, const gfx::TexturePixelType format, const gfx::TextureChannelDataType type) {
     auto obj = createUniqueTexture();
+    int textureByteSize = gl::TextureResource::getStorageSize(size, format, type);
+    stats.memTextures += textureByteSize;
     std::unique_ptr<gfx::TextureResource> resource =
-        std::make_unique<gl::TextureResource>(std::move(obj));
+        std::make_unique<gl::TextureResource>(std::move(obj), textureByteSize);
 
     // Always use texture unit 0 for manipulating it.
     activeTextureUnit = 0;
@@ -338,6 +279,7 @@ std::unique_ptr<gfx::RenderbufferResource>
 Context::createRenderbufferResource(const gfx::RenderbufferPixelType type, const Size size) {
     RenderbufferID id = 0;
     MBGL_CHECK_ERROR(glGenRenderbuffers(1, &id));
+    // NOLINTNEXTLINE(performance-move-const-arg)
     UniqueRenderbuffer renderbuffer{ std::move(id), { this } };
 
     bindRenderbuffer = renderbuffer;
@@ -506,13 +448,6 @@ Context::createOffscreenTexture(const Size size, const gfx::TextureChannelDataTy
     return std::make_unique<gl::OffscreenTexture>(*this, size, type);
 }
 
-std::unique_ptr<gfx::OffscreenTexture>
-Context::createOffscreenTexture(const Size size,
-                                gfx::Renderbuffer<gfx::RenderbufferPixelType::Depth>& depth,
-                                gfx::TextureChannelDataType type) {
-    return std::make_unique<gl::OffscreenTexture>(*this, size, depth, type);
-}
-
 std::unique_ptr<gfx::DrawScopeResource> Context::createDrawScopeResource() {
     return std::make_unique<gl::DrawScopeResource>(createVertexArray());
 }
@@ -589,6 +524,8 @@ void Context::clear(optional<mbgl::Color> color,
     }
 
     MBGL_CHECK_ERROR(glClear(mask));
+
+    stats.numDrawCalls = 0;
 }
 
 void Context::setCullFaceMode(const gfx::CullFaceMode& mode) {
@@ -655,6 +592,18 @@ std::unique_ptr<gfx::CommandEncoder> Context::createCommandEncoder() {
     return std::make_unique<gl::CommandEncoder>(*this);
 }
 
+gfx::RenderingStats& Context::renderingStats() {
+    return stats;
+}
+
+const gfx::RenderingStats& Context::renderingStats() const {
+    return stats;
+}
+
+void Context::finish() {
+    MBGL_CHECK_ERROR(glFinish());
+}
+
 void Context::draw(const gfx::DrawMode& drawMode,
                    std::size_t indexOffset,
                    std::size_t indexLength) {
@@ -679,6 +628,8 @@ void Context::draw(const gfx::DrawMode& drawMode,
         static_cast<GLsizei>(indexLength),
         GL_UNSIGNED_SHORT,
         reinterpret_cast<GLvoid*>(sizeof(uint16_t) * indexOffset)));
+
+    stats.numDrawCalls++;
 }
 
 void Context::performCleanup() {
@@ -715,6 +666,7 @@ void Context::performCleanup() {
             }
         }
         MBGL_CHECK_ERROR(glDeleteBuffers(int(abandonedBuffers.size()), abandonedBuffers.data()));
+        stats.numBuffers -= int(abandonedBuffers.size());
         abandonedBuffers.clear();
     }
 
@@ -727,6 +679,8 @@ void Context::performCleanup() {
             }
         }
         MBGL_CHECK_ERROR(glDeleteTextures(int(abandonedTextures.size()), abandonedTextures.data()));
+        stats.numCreatedTextures -= int(abandonedTextures.size());
+        assert(stats.numCreatedTextures >= 0);
         abandonedTextures.clear();
     }
 
@@ -750,6 +704,8 @@ void Context::performCleanup() {
         }
         MBGL_CHECK_ERROR(
             glDeleteFramebuffers(int(abandonedFramebuffers.size()), abandonedFramebuffers.data()));
+        stats.numFrameBuffers -= int(abandonedFramebuffers.size());
+        assert(stats.numFrameBuffers >= 0);
         abandonedFramebuffers.clear();
     }
 
@@ -758,7 +714,13 @@ void Context::performCleanup() {
                                                abandonedRenderbuffers.data()));
         abandonedRenderbuffers.clear();
     }
+}
 
+void Context::reduceMemoryUsage() {
+    performCleanup();
+
+    // Ensure that all pending actions are executed to ensure that they happen before the app goes
+    // to the background.
     MBGL_CHECK_ERROR(glFinish());
 }
 

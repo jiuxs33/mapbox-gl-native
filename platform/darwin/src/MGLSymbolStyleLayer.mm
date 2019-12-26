@@ -96,6 +96,11 @@ namespace mbgl {
         { MGLTextTransformLowercase, "lowercase" },
     });
 
+    MBGL_DEFINE_ENUM(MGLTextWritingMode, {
+        { MGLTextWritingModeHorizontal, "horizontal" },
+        { MGLTextWritingModeVertical, "vertical" },
+    });
+
     MBGL_DEFINE_ENUM(MGLIconTranslationAnchor, {
         { MGLIconTranslationAnchorMap, "map" },
         { MGLIconTranslationAnchorViewport, "viewport" },
@@ -243,12 +248,12 @@ namespace mbgl {
     if (iconImageName && iconImageName.expressionType == NSConstantValueExpressionType) {
         std::string string = ((NSString *)iconImageName.constantValue).UTF8String;
         if (mbgl::style::conversion::hasTokens(string)) {
-            self.rawLayer->setIconImage(mbgl::style::PropertyValue<std::string>(
-                mbgl::style::conversion::convertTokenStringToExpression(string)));
+            self.rawLayer->setIconImage(mbgl::style::PropertyValue<mbgl::style::expression::Image>(
+                mbgl::style::conversion::convertTokenStringToImageExpression(string)));
             return;
         }
     }
-    auto mbglValue = MGLStyleValueTransformer<std::string, NSString *>().toPropertyValue<mbgl::style::PropertyValue<std::string>>(iconImageName, true);
+    auto mbglValue = MGLStyleValueTransformer<mbgl::style::expression::Image, NSString *>().toPropertyValue<mbgl::style::PropertyValue<mbgl::style::expression::Image>>(iconImageName, true);
     self.rawLayer->setIconImage(mbglValue);
 }
 
@@ -259,7 +264,7 @@ namespace mbgl {
     if (propertyValue.isUndefined()) {
         propertyValue = self.rawLayer->getDefaultIconImage();
     }
-    return MGLStyleValueTransformer<std::string, NSString *>().toExpression(propertyValue);
+    return MGLStyleValueTransformer<mbgl::style::expression::Image, NSString *>().toExpression(propertyValue);
 }
 
 - (void)setIconImage:(NSExpression *)iconImage {
@@ -1023,6 +1028,31 @@ namespace mbgl {
     return MGLStyleValueTransformer<std::vector<mbgl::style::SymbolAnchorType>, NSArray<NSValue *> *, mbgl::style::SymbolAnchorType, MGLTextAnchor>().toExpression(propertyValue);
 }
 
+- (void)setTextWritingModes:(NSExpression *)textWritingModes {
+    MGLAssertStyleLayerIsValid();
+    MGLLogDebug(@"Setting textWritingModes: %@", textWritingModes);
+
+    auto mbglValue = MGLStyleValueTransformer<std::vector<mbgl::style::TextWritingModeType>, NSArray<NSValue *> *, mbgl::style::TextWritingModeType, MGLTextWritingMode>().toPropertyValue<mbgl::style::PropertyValue<std::vector<mbgl::style::TextWritingModeType>>>(textWritingModes, false);
+    self.rawLayer->setTextWritingMode(mbglValue);
+}
+
+- (NSExpression *)textWritingModes {
+    MGLAssertStyleLayerIsValid();
+
+    auto propertyValue = self.rawLayer->getTextWritingMode();
+    if (propertyValue.isUndefined()) {
+        propertyValue = self.rawLayer->getDefaultTextWritingMode();
+    }
+    return MGLStyleValueTransformer<std::vector<mbgl::style::TextWritingModeType>, NSArray<NSValue *> *, mbgl::style::TextWritingModeType, MGLTextWritingMode>().toExpression(propertyValue);
+}
+
+- (void)setTextWritingMode:(NSExpression *)textWritingMode {
+}
+
+- (NSExpression *)textWritingMode {
+    return self.textWritingModes;
+}
+
 #pragma mark - Accessing the Paint Attributes
 
 - (void)setIconColor:(NSExpression *)iconColor {
@@ -1597,6 +1627,16 @@ namespace mbgl {
     MGLTextTransform textTransform;
     [self getValue:&textTransform];
     return textTransform;
+}
+
++ (NSValue *)valueWithMGLTextWritingMode:(MGLTextWritingMode)textWritingModes {
+    return [NSValue value:&textWritingModes withObjCType:@encode(MGLTextWritingMode)];
+}
+
+- (MGLTextWritingMode)MGLTextWritingModeValue {
+    MGLTextWritingMode textWritingModes;
+    [self getValue:&textWritingModes];
+    return textWritingModes;
 }
 
 + (NSValue *)valueWithMGLIconTranslationAnchor:(MGLIconTranslationAnchor)iconTranslationAnchor {

@@ -1,3 +1,5 @@
+// clang-format off
+
 // This file is generated. Edit scripts/generate-style-code.js, then run `make style-code`.
 
 #include <mbgl/style/layers/symbol_layer_properties.hpp>
@@ -19,9 +21,15 @@ SymbolLayerProperties::SymbolLayerProperties(
 
 SymbolLayerProperties::~SymbolLayerProperties() = default;
 
+unsigned long SymbolLayerProperties::constantsMask() const {
+    return evaluated.constantsMask();
+}
+
 const SymbolLayer::Impl& SymbolLayerProperties::layerImpl() const {
     return static_cast<const SymbolLayer::Impl&>(*baseImpl);
 }
 
 } // namespace style
 } // namespace mbgl
+
+// clang-format on

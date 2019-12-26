@@ -5,6 +5,7 @@ const fs = require('fs');
 const ejs = require('ejs');
 const _ = require('lodash');
 const colorParser = require('csscolorparser');
+const assert = require('assert');
 
 require('../../../scripts/style-code');
 
@@ -14,34 +15,61 @@ const suffix = 'StyleLayer';
 
 let spec = _.merge(require('../../../scripts/style-spec'), require('./style-spec-overrides-v8.json'));
 
+// FIXME: https://github.com/mapbox/mapbox-gl-native/issues/15008
+delete spec.layout_circle["circle-sort-key"]
+delete spec.layout_line["line-sort-key"]
+delete spec.layout_fill["fill-sort-key"]
+
+class ConventionOverride {
+    constructor(val) {
+        if (typeof val === 'string') {
+            this.name_ = val;
+            this.enumName_ = null;
+        } else if (val instanceof Object) {
+            this.name_ = val.name;
+            this.enumName_ = val.enumName;
+        } else {
+            assert(false);
+        }
+    }
+
+    set name(name_) { this.name_ = name_; }
+    get name() { return this.name_; }
+    get enumName() { return this.enumName_ || this.name_; }
+}
+
 // Rename properties and keep `original` for use with setters and getters
 _.forOwn(cocoaConventions, function (properties, kind) {
-    _.forOwn(properties, function (newName, oldName) {
+    _.forOwn(properties, function (newConvention, oldName) {
+        let conventionOverride = new ConventionOverride(newConvention);
         let property = spec[kind][oldName];
-        if (newName.startsWith('is-')) {
-            property.getter = newName;
-            newName = newName.substr(3);
+        if (conventionOverride.name.startsWith('is-')) {
+            property.getter = conventionOverride.name;
+            conventionOverride.name = conventionOverride.name.substr(3);
         }
-        if (newName !== oldName) {
+
+        // Override enum name based on style-spec-cocoa-conventions-v8.json
+        property.enumName = conventionOverride.enumName;
+
+        if (conventionOverride.name !== oldName) {
             property.original = oldName;
+            delete spec[kind][oldName];
+            spec[kind][conventionOverride.name] = property;
         }
-        delete spec[kind][oldName];
-        spec[kind][newName] = property;
 
         // Update cross-references to this property in other properties'
         // documentation and requirements.
         let renameCrossReferences = function (property, name) {
-            property.doc = property.doc.replace(new RegExp('`' + oldName + '`', 'g'), '`' + newName + '`');
+            property.doc = property.doc.replace(new RegExp('`' + oldName + '`', 'g'), '`' + conventionOverride.name + '`');
             let requires = property.requires || [];
             for (let i = 0; i < requires.length; i++) {
                 if (requires[i] === oldName) {
-                    property.requires[i] = newName;
+                    property.requires[i] = conventionOverride.name;
                 }
                 if (typeof requires[i] !== 'string') {
-                    let prop = name;
                     _.forOwn(requires[i], function (values, name, require) {
                         if (name === oldName) {
-                            require[newName] = values;
+                            require[conventionOverride.name] = values;
                             delete require[name];
                         }
                     });
@@ -73,6 +101,28 @@ global.camelizeWithLeadingLowercase = function (str) {
         return x.toUpperCase();
     });
 };
+
+// Returns true only if property is an enum or if it is an array
+// property with uniquely defined enum.
+global.definesEnum = function(property, allProperties) {
+    if (property.type === "enum") {
+        return true;
+    }
+
+    if (property.type === 'array' && property.value === 'enum') {
+        const uniqueArrayEnum = (prop, enums) => {
+            if (prop.value !== 'enum') return false;
+            const enumsEqual = (val1, val2) => val1.length === val1.length && val1.every((val, i) => val === val2[i]);
+            return enums.filter(e => enumsEqual(Object.keys(prop.values).sort(), Object.keys(e.values).sort())).length == 0;
+        };
+
+        const allEnumProperties = _(allProperties).filter({'type': 'enum'}).value();
+        const uniqueArrayEnumProperties = _(allProperties).filter({'type': 'array'}).filter(prop => uniqueArrayEnum(prop, allEnumProperties)).value();
+        return _(uniqueArrayEnumProperties).filter({'name': property.name}).value().length != 0;
+    }
+
+    return false;
+}
 
 global.objCName = function (property) {
     return camelizeWithLeadingLowercase(property.name);
@@ -108,6 +158,10 @@ global.objCTestValue = function (property, layerType, arraysAsStructs, indent) {
             return layerType === 'string' ?
                 `@"'${_.startCase(propertyName)}'"` :
                 `@"${_.startCase(propertyName)}"`;
+        case 'resolvedImage':
+            return layerType === 'string' ?
+                `@"${_.startCase(propertyName)}"` :
+                `@"MGL_FUNCTION('image', '${_.startCase(propertyName)}')"`;
         case 'string':
             return `@"'${_.startCase(propertyName)}'"`;
         case 'enum':
@@ -139,6 +193,8 @@ global.objCTestValue = function (property, layerType, arraysAsStructs, indent) {
                 }
                 case 'anchor':
                     return `@"{'top','bottom'}"`;
+                case 'mode':
+                    return `@"{'horizontal','vertical'}"`;
                 default:
                     throw new Error(`unknown array type for ${property.name}`);
             }
@@ -156,6 +212,7 @@ global.mbglTestValue = function (property, layerType) {
             return '1.0';
         case 'formatted':
         case 'string':
+        case 'resolvedImage':
             return `"${_.startCase(propertyName)}"`;
         case 'enum': {
             let type = camelize(originalPropertyName(property));
@@ -189,6 +246,8 @@ global.mbglTestValue = function (property, layerType) {
                     return '{ 1, 1 }';
                 case 'anchor':
                     return '{ mbgl::style::SymbolAnchorType::Top, mbgl::style::SymbolAnchorType::Bottom }';
+                case 'mode':
+                    return '{ mbgl::style::TextWritingModeType::Horizontal, mbgl::style::TextWritingModeType::Vertical }';
                 default:
                     throw new Error(`unknown array type for ${property.name}`);
             }
@@ -208,6 +267,8 @@ global.mbglExpressionTestValue = function (property, layerType) {
             switch (arrayType(property)) {
                 case 'anchor':
                     return `{"top", "bottom"}`;
+                case 'mode':
+                    return `{"horizontal", "vertical"}`;
                 default:
                     break;
             }
@@ -238,6 +299,7 @@ global.testHelperMessage = function (property, layerType, isFunction) {
             return 'testNumber' + fnSuffix;
         case 'formatted':
         case 'string':
+        case 'resolvedImage':
             return 'testString' + fnSuffix;
         case 'enum':
             let objCType = global.objCType(layerType, property.name);
@@ -353,7 +415,7 @@ global.propertyDoc = function (propertyName, property, layerType, kind) {
             doc += '* Any of the following constant string values:\n';
             doc += Object.keys(property.values).map(value => '  * `' + value + '`: ' + property.values[value].doc).join('\n') + '\n';
         } else if (property.type === 'array' && property.value === 'enum') {
-            doc += '* Constant array, whose each element is any of the following constant string values:\n';
+            doc += '* Constant array, in which each element is any of the following constant string values:\n';
             doc += Object.keys(property.values).map(value => '  * `' + value + '`: ' + property.values[value].doc).join('\n') + '\n';
         }
         if (property.type === 'formatted') {
@@ -418,6 +480,7 @@ global.describeType = function (property) {
             return 'numeric';
         case 'formatted':
         case 'string':
+        case 'resolvedImage':
             return 'string';
         case 'enum':
             return '`MGL' + camelize(property.name) + '`';
@@ -434,6 +497,8 @@ global.describeType = function (property) {
                     return '`MGLSphericalPosition`';
                 case 'anchor':
                     return '`MGLTextAnchor` array';
+                case 'mode':
+                    return '`MGLTextWritingMode` array';
                 default:
                     return 'array';
             }
@@ -464,6 +529,7 @@ global.describeValue = function (value, property, layerType) {
             return 'the float ' + '`' + formatNumber(value) + '`';
         case 'formatted':
         case 'string':
+        case 'resolvedImage':
             if (value === '') {
                 return 'the empty string';
             }
@@ -538,6 +604,10 @@ global.originalPropertyName = function (property) {
     return property.original || property.name;
 };
 
+global.enumName = function (property) {
+    return property.enumName || property.name;
+};
+
 global.propertyType = function (property) {
     switch (property.type) {
         case 'boolean':
@@ -546,6 +616,7 @@ global.propertyType = function (property) {
             return 'NSNumber *';
         case 'formatted':
         case 'string':
+        case 'resolvedImage':
             return 'NSString *';
         case 'enum':
             return 'NSValue *';
@@ -563,6 +634,7 @@ global.propertyType = function (property) {
                 case 'translate':
                     return 'NSValue *';
                 case 'anchor':
+                case 'mode':
                     return 'NSArray<NSValue *> *';
                 default:
                     throw new Error(`unknown array type for ${property.name}`);
@@ -577,6 +649,7 @@ global.isInterpolatable = function (property) {
     return type !== 'boolean' &&
         type !== 'enum' &&
         type !== 'string' &&
+        type !== 'resolvedImage' &&
         type !== 'formatted';
 };
 
@@ -589,6 +662,8 @@ global.valueTransformerArguments = function (property) {
             return ['float', objCType];
         case 'formatted':
             return ['mbgl::style::expression::Formatted', objCType];
+        case 'resolvedImage':
+            return ['mbgl::style::expression::Image', objCType];
         case 'string':
             return ['std::string', objCType];
         case 'enum':
@@ -610,6 +685,8 @@ global.valueTransformerArguments = function (property) {
                     return ['std::array<float, 2>', objCType];
                 case 'anchor':
                     return ['std::vector<mbgl::style::SymbolAnchorType>', objCType, 'mbgl::style::SymbolAnchorType', 'MGLTextAnchor'];
+                case 'mode':
+                    return ['std::vector<mbgl::style::TextWritingModeType>', objCType, 'mbgl::style::TextWritingModeType', 'MGLTextWritingMode'];
                 default:
                     throw new Error(`unknown array type for ${property.name}`);
             }
@@ -626,6 +703,8 @@ global.mbglType = function(property) {
             return 'float';
         case 'formatted':
             return 'mbgl::style::expression::Formatted';
+        case 'resolvedImage':
+            return 'mbgl::style::expression::Image';
         case 'string':
             return 'std::string';
         case 'enum': {
@@ -661,6 +740,8 @@ global.mbglType = function(property) {
                     return 'mbgl::style::Position';
                 case 'anchor':
                     return 'std::vector<mbgl::style::SymbolAnchorType>';
+                case 'mode':
+                    return 'std::vector<mbgl::style::TextWritingModeType>';
                 default:
                     throw new Error(`unknown array type for ${property.name}`);
             }
@@ -768,7 +849,7 @@ var renamedPropertiesByLayerType = {};
 
 for (var layer of layers) {
     layer.properties = _.concat(layer.layoutProperties, layer.paintProperties);
-    let enumProperties = _.filter(layer.properties, prop => prop.type === 'enum');
+    let enumProperties = _.filter(layer.properties, prop => definesEnum(prop, layer.properties));
     if (enumProperties.length) {
         layer.enumProperties = enumProperties;
     }

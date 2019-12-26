@@ -1,3 +1,5 @@
+// clang-format off
+
 // This file is generated. Edit scripts/generate-style-code.js, then run `make style-code`.
 
 #pragma once
@@ -55,6 +57,8 @@ public:
         HillshadePaintProperties::PossiblyEvaluated);
     ~HillshadeLayerProperties() override;
 
+    unsigned long constantsMask() const override;
+
     const HillshadeLayer::Impl& layerImpl() const;
     // Data members.
     HillshadePaintProperties::PossiblyEvaluated evaluated;
@@ -62,3 +66,5 @@ public:
 
 } // namespace style
 } // namespace mbgl
+
+// clang-format on

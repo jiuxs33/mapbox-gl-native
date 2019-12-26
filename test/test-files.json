@@ -23,10 +23,10 @@
         "test/math/clamp.test.cpp",
         "test/math/minmax.test.cpp",
         "test/math/wrap.test.cpp",
-        "test/programs/binary_program.test.cpp",
         "test/programs/symbol_program.test.cpp",
         "test/renderer/backend_scope.test.cpp",
         "test/renderer/image_manager.test.cpp",
+        "test/renderer/pattern_atlas.test.cpp",
         "test/sprite/sprite_loader.test.cpp",
         "test/sprite/sprite_parser.test.cpp",
         "test/src/mbgl/test/fixture_log_observer.cpp",
@@ -46,6 +46,7 @@
         "test/storage/online_file_source.test.cpp",
         "test/storage/resource.test.cpp",
         "test/storage/sqlite.test.cpp",
+        "test/storage/sync_file_source.test.cpp",
         "test/style/conversion/conversion_impl.test.cpp",
         "test/style/conversion/function.test.cpp",
         "test/style/conversion/geojson_options.test.cpp",
@@ -65,18 +66,23 @@
         "test/style/style_layer.test.cpp",
         "test/style/style_parser.test.cpp",
         "test/text/bidi.test.cpp",
+        "test/text/calculate_tile_distances.test.cpp",
         "test/text/cross_tile_symbol_index.test.cpp",
+        "test/text/formatted.test.cpp",
+        "test/text/get_anchors.test.cpp",
         "test/text/glyph_manager.test.cpp",
         "test/text/glyph_pbf.test.cpp",
         "test/text/language_tag.test.cpp",
         "test/text/local_glyph_rasterizer.test.cpp",
         "test/text/quads.test.cpp",
+        "test/text/shaping.test.cpp",
         "test/text/tagged_string.test.cpp",
         "test/tile/custom_geometry_tile.test.cpp",
         "test/tile/geojson_tile.test.cpp",
         "test/tile/geometry_tile_data.test.cpp",
         "test/tile/raster_dem_tile.test.cpp",
         "test/tile/raster_tile.test.cpp",
+        "test/tile/tile_cache.test.cpp",
         "test/tile/tile_coordinate.test.cpp",
         "test/tile/tile_id.test.cpp",
         "test/tile/vector_tile.test.cpp",
@@ -91,7 +97,6 @@
         "test/util/merge_lines.test.cpp",
         "test/util/number_conversions.test.cpp",
         "test/util/offscreen_texture.test.cpp",
-        "test/util/peer.test.cpp",
         "test/util/position.test.cpp",
         "test/util/projection.test.cpp",
         "test/util/run_loop.test.cpp",
@@ -106,7 +111,8 @@
         "test/util/url.test.cpp"
     ],
     "public_headers": {
-        "mbgl/test.hpp": "test/include/mbgl/test.hpp"
+        "mbgl/test.hpp": "test/include/mbgl/test.hpp",
+        "mbgl/test/util.hpp": "test/include/mbgl/test/util.hpp"
     },
     "private_headers": {
         "mbgl/test/fake_file_source.hpp": "test/src/mbgl/test/fake_file_source.hpp",
@@ -121,7 +127,6 @@
         "mbgl/test/stub_map_observer.hpp": "test/src/mbgl/test/stub_map_observer.hpp",
         "mbgl/test/stub_render_source_observer.hpp": "test/src/mbgl/test/stub_render_source_observer.hpp",
         "mbgl/test/stub_style_observer.hpp": "test/src/mbgl/test/stub_style_observer.hpp",
-        "mbgl/test/stub_tile_observer.hpp": "test/src/mbgl/test/stub_tile_observer.hpp",
-        "mbgl/test/util.hpp": "test/src/mbgl/test/util.hpp"
+        "mbgl/test/stub_tile_observer.hpp": "test/src/mbgl/test/stub_tile_observer.hpp"
     }
 }

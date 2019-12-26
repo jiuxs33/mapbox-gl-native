@@ -16,15 +16,10 @@ private:
     void evaluate(const PropertyEvaluationParameters&) override;
     bool hasTransition() const override;
     bool hasCrossfade() const override;
-    void render(PaintParameters&, RenderSource*) override;
+    void render(PaintParameters&) override;
 
-    bool queryIntersectsFeature(
-            const GeometryCoordinates&,
-            const GeometryTileFeature&,
-            const float,
-            const TransformState&,
-            const float,
-            const mat4&) const override;
+    bool queryIntersectsFeature(const GeometryCoordinates&, const GeometryTileFeature&, const float,
+                                const TransformState&, const float, const mat4&, const FeatureState&) const override;
 
     // Paint properties
     style::CirclePaintProperties::Unevaluated unevaluated;

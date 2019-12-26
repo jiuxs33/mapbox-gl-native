@@ -1,7 +1,6 @@
 #pragma once
 
 #include <mbgl/gfx/context.hpp>
-#include <mbgl/gl/features.hpp>
 #include <mbgl/gl/object.hpp>
 #include <mbgl/gl/state.hpp>
 #include <mbgl/gl/value.hpp>
@@ -33,7 +32,6 @@ class RendererBackend;
 namespace extension {
 class VertexArray;
 class Debugging;
-class ProgramBinary;
 } // namespace extension
 
 class Context final : public gfx::Context {
@@ -45,23 +43,18 @@ public:
 
     std::unique_ptr<gfx::CommandEncoder> createCommandEncoder() override;
 
+    gfx::RenderingStats& renderingStats();
+    const gfx::RenderingStats& renderingStats() const override;
+
     void initializeExtensions(const std::function<gl::ProcAddress(const char*)>&);
 
     void enableDebugging();
 
     UniqueShader createShader(ShaderType type, const std::initializer_list<const char*>& sources);
     UniqueProgram createProgram(ShaderID vertexShader, ShaderID fragmentShader, const char* location0AttribName);
-    UniqueProgram createProgram(BinaryProgramFormat binaryFormat, const std::string& binaryProgram);
     void verifyProgramLinkage(ProgramID);
     void linkProgram(ProgramID);
     UniqueTexture createUniqueTexture();
-
-#if MBGL_HAS_BINARY_PROGRAMS
-    bool supportsProgramBinaries() const;
-#else
-    constexpr static bool supportsProgramBinaries() { return false; }
-#endif
-    optional<std::pair<BinaryProgramFormat, std::string>> getBinaryProgram(ProgramID) const;
 
     Framebuffer createFramebuffer(const gfx::Renderbuffer<gfx::RenderbufferPixelType::RGBA>&,
                                   const gfx::Renderbuffer<gfx::RenderbufferPixelType::DepthStencil>&);
@@ -102,9 +95,13 @@ public:
               std::size_t indexOffset,
               std::size_t indexLength);
 
+    void finish();
+
     // Actually remove the objects we marked as abandoned with the above methods.
     // Only call this while the OpenGL context is exclusive to this thread.
     void performCleanup() override;
+
+    void reduceMemoryUsage() override;
 
     // Drain pools and remove abandoned objects, in preparation for destroying the store.
     // Only call this while the OpenGL context is exclusive to this thread.
@@ -138,11 +135,9 @@ private:
     RendererBackend& backend;
     bool cleanupOnDestruction = true;
 
+    gfx::RenderingStats stats;
     std::unique_ptr<extension::Debugging> debugging;
     std::unique_ptr<extension::VertexArray> vertexArray;
-#if MBGL_HAS_BINARY_PROGRAMS
-    std::unique_ptr<extension::ProgramBinary> programBinary;
-#endif
 
 public:
     State<value::ActiveTextureUnit> activeTextureUnit;
@@ -194,10 +189,6 @@ private:
 
     std::unique_ptr<gfx::OffscreenTexture> createOffscreenTexture(
         Size, gfx::TextureChannelDataType = gfx::TextureChannelDataType::UnsignedByte) override;
-    std::unique_ptr<gfx::OffscreenTexture> createOffscreenTexture(
-        Size,
-        gfx::Renderbuffer<gfx::RenderbufferPixelType::Depth>&,
-        gfx::TextureChannelDataType = gfx::TextureChannelDataType::UnsignedByte) override;
 
     std::unique_ptr<gfx::TextureResource>
         createTextureResource(Size, gfx::TexturePixelType, gfx::TextureChannelDataType) override;

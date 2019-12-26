@@ -1,8 +1,377 @@
 # Changelog for the Mapbox Maps SDK for Android
-
 Mapbox welcomes participation and contributions from everyone.  If you'd like to do so please see the [`Contributing Guide`](https://github.com/mapbox/mapbox-gl-native/blob/master/CONTRIBUTING.md) first to get started.
 
+## Notice
+**Work on the Mapbox Maps SDK for Android is now happening at https://github.com/mapbox/mapbox-gl-native-android.**
+Please see the README at https://github.com/mapbox/mapbox-gl-native-android for the most up-to-date information on the Maps SDK for Android.
+
 ## master
+- Added support for [image expression](https://docs.mapbox.com/mapbox-gl-js/style-spec/#expressions-types-image) in core library. Runtime APIs for image expression will be implemented separately. [#15877](https://github.com/mapbox/mapbox-gl-native/pull/15877)
+- Make network requests for expired resources lower priority than requests for new resources. ([#15950](https://github.com/mapbox/mapbox-gl-native/pull/15950))
+
+### Bug fixes
+ - Fixed the rendering bug caused by redundant pending requests for already requested images [#15864](https://github.com/mapbox/mapbox-gl-native/pull/15864)
+ - Fixed Geo JSON source flickering on style transition [#15907](https://github.com/mapbox/mapbox-gl-native/pull/15907)
+ - Fixed flickering caused by unnecessary removing and re-adding of the render sources when the order of their corresponding style objects was changed in the updated style [#15941](https://github.com/mapbox/mapbox-gl-native/pull/15941)
+
+### Performance improvements
+ - Enable incremental vacuum for the offline database in order to make data removal requests faster and to avoid the excessive disk space usage (creating a backup file on VACUUM call) [#15837](https://github.com/mapbox/mapbox-gl-native/pull/15837)
+ - Convert GeoJSON features to tiles in a background thread and thus unblock the UI thread on updating the GeoJsonSource [#15871](https://github.com/mapbox/mapbox-gl-native/pull/15871)
+ - Convert GeoJSON features to tiles for the loaded source description in a background thread and thus unblock the UI thread [#15885](https://github.com/mapbox/mapbox-gl-native/pull/15885)
+
+### Features
+- Introduce `OfflineManager#packDatabase` and `OfflineRegion#deleteAndSkipPackDatabase` API in order to decouple offline storage vacuum and delete region operations and thus to gain performance benefits e.g. when several regions should be deleted in a row [#15899](https://github.com/mapbox/mapbox-gl-native/pull/15899)
+
+## 8.5.0-alpha.2 - October 10, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.5.0-alpha.1...android-v8.5.0-alpha.2) since [Mapbox Maps SDK for Android v8.5.0-alpha.1](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.5.0-alpha.1):
+
+### Features
+ - Expose pre-fetching zoom delta, allows to granular control the delta on which we prefetch tiles [#15769](https://github.com/mapbox/mapbox-gl-native/pull/15769)
+
+### Performance improvements
+ - Improved rendering performance for the styles with multiple sources [#15756](https://github.com/mapbox/mapbox-gl-native/pull/15756)
+
+### Bug fixes
+ - Fixed runtime exceptions that occurred when a manually built camera object without padding was serialized. [#15788](https://github.com/mapbox/mapbox-gl-native/pull/15788)
+ - Keep Mapbox when obfuscating code with proguard [#15762](https://github.com/mapbox/mapbox-gl-native/pull/15762)
+
+## 8.5.0-alpha.1 - October 3, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.4.0...android-v8.5.0-alpha.1) since [Mapbox Maps SDK for Android v8.4.0](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.4.0):
+### Bug fixes
+ - Suppress network requests for expired tiles update, if these tiles are invisible. [#15741](https://github.com/mapbox/mapbox-gl-native/pull/15741)
+ - Fixed opacity interpolation for composition expressions [#15738](https://github.com/mapbox/mapbox-gl-native/pull/15738)
+ - Fixed an issue where `Projection#getMetersPerPixelAtLatitude` returned a value incorrectly divided by the pixel ratio. This also fixes an issue where `LocationComponent` accuracy circle's radius was artificially increased. [#15742](https://github.com/mapbox/mapbox-gl-native/pull/15742)
+ - Coalesce requests to the client for the same missing image [#15778](https://github.com/mapbox/mapbox-gl-native/pull/15778)
+
+## 8.4.0 - September 25, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.4.0-beta.1...android-v8.4.0) since [Mapbox Maps SDK for Android v8.4.0-beta.1](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.4.0-beta.1): 
+
+### Bug fixes
+ - Fixing a crash when `CameraPosition` padding is set when using `MapSnapshotter`. [#15699](https://github.com/mapbox/mapbox-gl-native/pull/15699)
+
+### Other Changes
+ - Bumped Java SDK dependency to stable 4.9.0 [#15700](https://github.com/mapbox/mapbox-gl-native/pull/15700)
+ - Migrate map feedback to GL JS–powered feedback form [#15623](https://github.com/mapbox/mapbox-gl-native/pull/15623)
+
+## 8.4.0-beta.1 - September 19, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.4.0-alpha.2...android-v8.4.0-beta.1) since [Mapbox Maps SDK for Android v8.4.0-alpha.2](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.4.0-alpha.2): 
+
+### Bug fixes
+ - Fixed an issue that `maxzoom` in style `Sources` option was ignored when URL resource is provided. It may cause problems such as extra tiles downloading at higher zoom level than `maxzoom`, or problems that wrong setting of `overscaledZ` in `OverscaledTileID` that will be passed to `SymbolLayout`, leading wrong rendering appearance. [#15581](https://github.com/mapbox/mapbox-gl-native/pull/15581)
+ - Fixed constant repainting for the sources with invisible layers, caused by `RenderSource::hasFadingTiles()` returning `true` all the time. [#15600](https://github.com/mapbox/mapbox-gl-native/pull/15600)
+ - Fixed an issue that caused the state of CompassView not up to date when `UiSettings.setCompassEnabled()` is set to true. [#15606](https://github.com/mapbox/mapbox-gl-native/pull/15606)
+ - Ignore location tracking mode based animations when the camera is transitioning. [#15641](https://github.com/mapbox/mapbox-gl-native/pull/15641)
+ - Fixed MapSnapshotter so that `MapSnapshotter.withApiBaseUri` works again. [#15642](https://github.com/mapbox/mapbox-gl-native/pull/15642)
+ - Fixed an assertion hit caused by possibility of adding a layer to an incompatible source. [#15644](https://github.com/mapbox/mapbox-gl-native/pull/15644)
+
+## 8.3.2 - September 19, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.3.1...android-v8.3.2) since [Mapbox Maps SDK for Android v8.3.1](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.3.1):
+
+### Bug fixes
+ - Fixed an issue of integer overflow when converting `tileCoordinates` to `LatLon`, which caused issues such as `queryRenderedFeatures` and `querySourceFeatures` returning incorrect coordinates at zoom levels 20 and higher. [#15560](https://github.com/mapbox/mapbox-gl-native/pull/15560)
+
+## 8.3.1 - September 18, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.3.0...android-v8.3.1) since [Mapbox Maps SDK for Android v8.3.0](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.3.0):
+
+### Bug fixes
+ - Updated earcut.hpp submodule file [#15660](https://github.com/mapbox/mapbox-gl-native/pull/15660)
+ - Fixed a wrong variable assignment of `MapSnapshotter.Options.withApiBaseUri`. [#15642](https://github.com/mapbox/mapbox-gl-native/pull/15642)
+
+## 8.4.0-alpha.2 - September 11, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.4.0-alpha.1...android-v8.4.0-alpha.2) since [Mapbox Maps SDK for Android v8.4.0-alpha.1](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.4.0-alpha.1): 
+
+### Performance improvements
+ - Newly loaded labels appear faster on the screen. [#15308](https://github.com/mapbox/mapbox-gl-native/pull/15308)
+
+### Bug fixes
+ - Fixed an issue of integer overflow when converting `tileCoordinates` to `LatLon`, which caused issues such as `queryRenderedFeatures` and `querySourceFeatures` returning incorrect coordinates at zoom levels 20 and higher. [#15560](https://github.com/mapbox/mapbox-gl-native/pull/15560)
+
+### Other Changes
+ - Bumped Java SDK dependency to 4.9.0-alpha.1 [#15570](https://github.com/mapbox/mapbox-gl-native/pull/15570)
+ 
+## 8.4.0-alpha.1 - September 4, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.3.0...android-v8.4.0-alpha.1) since [Mapbox Maps SDK for Android v8.3.0](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.3.0):
+
+### Features
+ - Introduce `clusterProperties` option for aggregated cluster properties. [#15425](https://github.com/mapbox/mapbox-gl-native/pull/15425)
+ - Expose the `CameraPosition#padding` field and associated utility camera position builders. This gives a choice to set a persisting map padding immediately during a transition instead of setting it lazily `MapboxMap#setPadding`, which required scheduling additional transition to be applied. This also deprecates `MapboxMap#setPadding` as there should be no need for a lazy padding setter. [#15444](https://github.com/mapbox/mapbox-gl-native/pull/15444)
+ - Add number-format expression that allows to format a number to a string, with configurations as minimal/maximal fraction and locale/currency. [#15424](https://github.com/mapbox/mapbox-gl-native/pull/15424)
+ - Enable using of `text-offset` option together with `text-variable-anchor` (if `text-radial-offset` option is not provided). If used with `text-variable-anchor`, input values will be taken as absolute values. Offsets along the x- and y-axis will be applied automatically based on the anchor position. [#15542](https://github.com/mapbox/mapbox-gl-native/pull/15542)
+
+### Bug fixes
+- Fixed a rendering issue of `collisionBox` when `text-translate` or `icon-translate` is enabled. [#15467](https://github.com/mapbox/mapbox-gl-native/pull/15467)
+- Fixed unnecessary layers blink when the same components are re-added after the style reload [#15513](https://github.com/mapbox/mapbox-gl-native/pull/15513)
+- Fixed an issue in JNI marshaling code that converted a float to long that produced invalid expressions [#15557](https://github.com/mapbox/mapbox-gl-native/pull/15557)
+- Call callback onFinish() immediately when trying to move camera to current position [#15558](https://github.com/mapbox/mapbox-gl-native/pull/15558)
+
+### Performance improvements
+ - Mark used offline region resources in batches. [#15521](https://github.com/mapbox/mapbox-gl-native/pull/15521)
+
+### Other Changes
+- JNI binding refactor [#15462](https://github.com/mapbox/mapbox-gl-native/pull/15462)
+- Javadoc changes to clarify OfflineManager methods [#15519](https://github.com/mapbox/mapbox-gl-native/pull/15519)
+
+## 8.3.0 - August 28, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.3.0-beta.1...android-v8.3.0) since [Mapbox Maps SDK for Android v8.3.0-beta.1](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.3.0-beta.1):
+
+This release changes how offline tile requests are billed — they are now billed on a pay-as-you-go basis and all developers are able raise the offline tile limit for their users. Offline requests were previously exempt from monthly active user (MAU) billing and increasing the offline per-user tile limit to more than 6,000 tiles required the purchase of an enterprise license. By upgrading to this release, you are opting into the changes outlined in [this blog post](https://blog.mapbox.com/offline-maps-for-all-bb0fc51827be) and [#15380](https://github.com/mapbox/mapbox-gl-native/pull/15380).
+
+### Features
+ - Allow ability to pass a string array resource into `localIdeographFontFamily` for enabling/disabling the feature and specifying fallback fonts. [#15488](https://github.com/mapbox/mapbox-gl-native/pull/15488)
+
+### Bug fixes
+ - Fixed a rendering issue caused by all icons being treated as SDFs if an SDF and non-SDF icon were in the same layer. [#15456](https://github.com/mapbox/mapbox-gl-native/pull/15456)
+ - Fixed an issue where changing location's render mode when the`LocationComponent` is disable wouldn't invalidate the foreground icon when it's back enabled. [#15507](https://github.com/mapbox/mapbox-gl-native/pull/15507)
+
+## 8.2.2 - August 23, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.2.1...android-v8.2.2) since [Mapbox Maps SDK for Android v8.2.1](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.2.1):
+
+### Bug fixes
+ - Fixed a possible crash that could be caused by invoking the wrong layer implementation casting function. [#15398](https://github.com/mapbox/mapbox-gl-native/pull/15398)
+ - Fixed use of objects after moving, potentially causing crashes. [#15408](https://github.com/mapbox/mapbox-gl-native/pull/1540)
+ - Fixed a wrong calculation of visibility in high pitch scenarios which might've led to tiles in the viewport not being rendered. [#15461](https://github.com/mapbox/mapbox-gl-native/pull/15461)
+
+### Other Changes
+ - Do not invalidate the camera immediately when map padding is set. Reverts a change introduced in the `v8.2.0`. [#15437](https://github.com/mapbox/mapbox-gl-native/pull/15437)
+
+## 8.3.0-beta.1 - August 22, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.3.0-alpha.3...android-v8.3.0-beta.1) since [Mapbox Maps SDK for Android v8.3.0-alpha.3](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.3.0-alpha.3):
+
+### Bug fixes
+ - Fixed a bug where glyphs generated through the LocalGlyphRasterizer interface were changing fonts during some zoom changes. [#15407](https://github.com/mapbox/mapbox-gl-native/pull/15407)
+ - Fixed use of objects after moving, potentially causing crashes. [#15408](https://github.com/mapbox/mapbox-gl-native/pull/15408)
+ - Fixed a possible crash that could be caused by invoking the wrong layer implementation casting function [#15398](https://github.com/mapbox/mapbox-gl-native/pull/15398).
+ - Font lookup on pre lollipop devices failed, provide default font list instead [#15410](https://github.com/mapbox/mapbox-gl-native/pull/15410).
+ - Fixed rendering and collision detection issues with using `text-variable-anchor` and `icon-text-fit` properties on the same layer [#15367](https://github.com/mapbox/mapbox-gl-native/pull/15367).
+ - Fixed a bug where quick-scale was registered during a move gesture that followed a double-tap. Bumped gestures library to `v0.5.1`. [#15427](https://github.com/mapbox/mapbox-gl-native/pull/15427)
+ - Fixed symbol overlap when zooming out quickly. [#15416](https://github.com/mapbox/mapbox-gl-native/pull/15416)
+
+### Other Changes
+ - Do not invalidate the camera immediately when map padding is set. Reverts a change introduced in the `v8.2.0`. [#15437](https://github.com/mapbox/mapbox-gl-native/pull/15437)
+
+### Docs
+ - Add javadoc to OnStyleImageMissingListener indicating the required synchronous addition images, document workaround [#15418](https://github.com/mapbox/mapbox-gl-native/pull/15418)
+
+## 8.3.0-alpha.3 - August 15, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.3.0-alpha.2...android-v8.3.0-alpha.3) since [Mapbox Maps SDK for Android v8.3.0-alpha.2](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.3.0-alpha.2):
+
+### Gestures handling
+ - Bumped gestures library version to v0.5.0 which replaces the compat gesture detector with a custom scale gesture detector implementation. This is a softly breaking change because the underlying scale gesture detector reference has been removed. This brings a set of improvements to gestures without removing any functionality from the previous implementation. [#15136](https://github.com/mapbox/mapbox-gl-native/pull/15136)
+ - Improved scale and rotate gestures by refining sensitivity thresholds and animation velocity. [#15136](https://github.com/mapbox/mapbox-gl-native/pull/15136)
+ - Improved quick-zoom gestures by making zoom changes linear. Quick-zoom scale changes are now executed based on y-axis delta changes. [#15386](https://github.com/mapbox/mapbox-gl-native/pull/15386)
+
+### Features
+ - Introduced the text-writing-mode layout property for symbol layers. This property allows labels to be placed horizontally or vertically. The property accepts an array of enumeration values from a ( horizontal | vertical ) set. [#14932](https://github.com/mapbox/mapbox-gl-native/pull/14932)
+ - Added support for fallback fonts in `localIdeographFontFamily`. [#15255](https://github.com/mapbox/mapbox-gl-native/pull/15255)
+
+### Bug fixes
+ - Fixed an issue where it was possible to set the map’s content insets then tilt the map enough to see the horizon, causing performance issues [#15195](https://github.com/mapbox/mapbox-gl-native/pull/15195)
+ - Allow loading of a map without a style URI or style JSON [#15293](https://github.com/mapbox/mapbox-gl-native/pull/15293)
+ - Fixed an issue where animated camera transitions zoomed in or out too dramatically [#15281](https://github.com/mapbox/mapbox-gl-native/pull/15281)
+ - Enable variable label placement when `text-allow-overlap` property is set to true [#15354](https://github.com/mapbox/mapbox-gl-native/pull/15354)
+
+## 8.3.0-alpha.2 - August 7, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.3.0-alpha.1...android-v8.3.0-alpha.2) since [Mapbox Maps SDK for Android v8.3.0-alpha.1](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.3.0-alpha.1):
+
+### Bug fixes
+ - Load a style without an URI or JSON [#15293](https://github.com/mapbox/mapbox-gl-native/pull/15293)
+ - Do not try to wake up the RunLoop if a wake is already pending. Fixes offline downloads that could freeze after resuming. [#15330](https://github.com/mapbox/mapbox-gl-native/pull/15330)
+
+## 8.0.2 - July 31, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.0.1...android-v8.0.2) since [Mapbox Maps SDK for Android v8.0.1](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.0.1):
+
+### Bug fixes
+ - Fixed rendering layers after fill-extrusion regression caused by optimization of fill-extrusion rendering [#15065](https://github.com/mapbox/mapbox-gl-native/pull/15065)
+ - Fixed a map update bug caused by the render tiles and the render passes getting unsynchronized [#15092](https://github.com/mapbox/mapbox-gl-native/pull/15092)
+ - Fixed a custom geometry source bug caused by using the outdated tiles after style update [#15112](https://github.com/mapbox/mapbox-gl-native/pull/15112)
+ - Ensure location shadow's gradient radius is greater than 0 [#15099](https://github.com/mapbox/mapbox-gl-native/pull/15099)
+
+## 7.4.1 - July 31, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v7.4.0...android-v7.4.1) since [Mapbox Maps SDK for Android v7.4.0](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v7.4.0):
+
+### Bug fixes
+ - Fixed a map update bug caused by the render tiles and the render passes getting unsynchronized [#15092](https://github.com/mapbox/mapbox-gl-native/pull/15092)
+ - Ensure location shadow's gradient radius is greater than 0 [#15099](https://github.com/mapbox/mapbox-gl-native/pull/15099)
+ - Fixed a custom geometry source bug caused by using the outdated tiles after style update [#15112](https://github.com/mapbox/mapbox-gl-native/pull/15112)
+
+## 8.3.0-alpha.1 - July 31, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.2.0...android-v8.3.0-alpha.1) since [Mapbox Maps SDK for Android v8.2.0](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.2.0):
+
+### Features
+ - Do not include CJK ideographs in the offline packs by default. This decreases overall offline download size but changes appearance by a default set local glyph generation [#14269](https://github.com/mapbox/mapbox-gl-native/pull/14269)
+ - Update target SDK to 28, update support library and fix gradle warnings [#15135](https://github.com/mapbox/mapbox-gl-native/pull/15135)
+ - Introduce VertexVector::extend() and use it in placement code [#15194](https://github.com/mapbox/mapbox-gl-native/pull/15194)
+
+### Bug fixes
+ - Save location animation timestamp only when fed. Fixes an issue where external camera updates impacted location animation duration[#15265](https://github.com/mapbox/mapbox-gl-native/pull/15265)
+ - Fixed flickering on style change for the same tile set [#15127](https://github.com/mapbox/mapbox-gl-native/pull/15127)
+ - Fix location render/camera modes being reinitialized even when the new mode is the same [#15266](https://github.com/mapbox/mapbox-gl-native/pull/15266)
+ - Ensure default local ideographs font family is not overwrote. Fix a bug that prevented local CJK glyphs generation. The local generation is now enabled by default and the font family used for generation is set to "sans-serif. [#15253](https://github.com/mapbox/mapbox-gl-native/pull/15253)
+ - Fix int overflow issue in GridIndex [#15245](https://github.com/mapbox/mapbox-gl-native/pull/15245)
+ - Align gesture animation reason for onCameraMoveStarted [#15218](https://github.com/mapbox/mapbox-gl-native/pull/15218)
+ - Remove layers first when clearing the style, fixes unnecessary log dumps [#15191](https://github.com/mapbox/mapbox-gl-native/pull/15191)
+ - Remove unused field from icon buffer [#15189](https://github.com/mapbox/mapbox-gl-native/pull/15189)
+
+### Performance improvements
+ - Release quad data after vertex buffers are created [#15189](https://github.com/mapbox/mapbox-gl-native/pull/15189)
+ - Decrease size of SymbolBucket [#15178](https://github.com/mapbox/mapbox-gl-native/pull/15178)
+ - Avoid geometry collections copying [#15201](https://github.com/mapbox/mapbox-gl-native/pull/15201)
+
+## 8.2.1 - July 31, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.2.0...android-v8.2.1) since [Mapbox Maps SDK for Android v8.2.0](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.2.0):
+
+### Bug fixes
+ - Save location animation timestamp only when fed [#15265](https://github.com/mapbox/mapbox-gl-native/pull/15265)
+
+## 8.1.1 - July 26, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.1.0...android-v8.1.1) since [Mapbox Maps SDK for Android v8.1.0](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.1.0):
+
+### Bug fixes
+ - Fixed rendering layers after fill-extrusion regression caused by optimization of fill-extrusion rendering [#15065](https://github.com/mapbox/mapbox-gl-native/pull/15065)
+ - Fixed a map update bug caused by the render tiles and the render passes getting unsynchronized [#15092](https://github.com/mapbox/mapbox-gl-native/pull/15092)
+ - Fixed collision with content insets [#15130](https://github.com/mapbox/mapbox-gl-native/pull/15130)
+ - Fixed a custom geometry source bug caused by using the outdated tiles after style update [#15112](https://github.com/mapbox/mapbox-gl-native/pull/15112)
+ - Allow map panning after quick zoom is disabled but a phantom gesture is executed [#15093](https://github.com/mapbox/mapbox-gl-native/pull/15093)
+ - Ensure location shadow's gradient radius is greater than 0 [#15099](https://github.com/mapbox/mapbox-gl-native/pull/15099)
+ - Ensure that move detector is enabled if double-tap is interrupted [#15103](https://github.com/mapbox/mapbox-gl-native/pull/15103)
+
+## 8.2.0 - July 24, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.2.0-beta.1...android-v8.2.0) since [Mapbox Maps SDK for Android v8.2.0-beta.1](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.2.0-beta.1):
+
+### Bug fixes
+ - Fix rendering of layers that are on top of fill-extrusion layers [#15065](https://github.com/mapbox/mapbox-gl-native/pull/15065)
+
+## 8.2.0-beta.1 - July 18, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.2.0-alpha.3...android-v8.2.0-beta.1) since [Mapbox Maps SDK for Android v8.2.0-alpha.3](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.2.0-alpha.3):
+
+### Bug fixes
+ - Fix `CustomGeometrySource` bug caused by usage of outdated tiles after a style update [#15112](https://github.com/mapbox/mapbox-gl-native/pull/15112)
+ - Fix bug where previous anchors set in `text-variable-anchor` were still preferred after anchor options were reset [#15129](https://github.com/mapbox/mapbox-gl-native/pull/15129)
+ - Fix issue where annotations could not be selected due to a regression in content insets [#15130](https://github.com/mapbox/mapbox-gl-native/pull/15130)
+
+## 8.2.0-alpha.3 - July 11, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.2.0-alpha.2...android-v8.2.0-alpha.3) since [Mapbox Maps SDK for Android v8.2.0-alpha.2](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.2.0-alpha.2):
+
+### Bug fixes
+ - Fix map update bug caused by render tiles and render passes becoming unsynchronized [#15092](https://github.com/mapbox/mapbox-gl-native/pull/15092)
+ - Fix fill-extrusion layers always rendered above other layers [#15065](https://github.com/mapbox/mapbox-gl-native/pull/15065)
+ - Fix a bug where map panning would be blocked after a quick zoom gesture was attempted when quick zoom is set to be ignored by `UiSettings` preferences [#15093](https://github.com/mapbox/mapbox-gl-native/pull/15093)
+ - Fix a bug where map panning would be blocked if double-tap is interrupted [#15103](https://github.com/mapbox/mapbox-gl-native/pull/15103)
+ 
+### Minor features and improvements
+ - Improve performance of queryRenderedFeatures by removing unnecessary iterations over vectors and unneeded layers [#14930](https://github.com/mapbox/mapbox-gl-native/pull/14930)
+ - Decrease the minimum pixel distance between the current camera position and the target required to interpolate during camera animation [#15073](https://github.com/mapbox/mapbox-gl-native/pull/15073)
+ - Introduce `MapboxMapOptions` facility creation method [#15069](https://github.com/mapbox/mapbox-gl-native/pull/15069)
+ - Throw configuration exception when accessing Mapbox services with an invalid token [#15081](https://github.com/mapbox/mapbox-gl-native/pull/15081)
+ - Allow setting a null access token in the runtime [#15081](https://github.com/mapbox/mapbox-gl-native/pull/15081)
+ - Ensure location shadow's gradient radius is greater than 0 [#15099](https://github.com/mapbox/mapbox-gl-native/pull/15099)
+ 
+### Other Changes
+ - Update okhttp to latest stable version that support pre lollipop (`3.12.3`) [#15087](https://github.com/mapbox/mapbox-gl-native/pull/15087)
+ - Fix up "match" expressions docs with stop arguments [#15102](https://github.com/mapbox/mapbox-gl-native/pull/15102)
+
+## 8.2.0-alpha.2 - July 3, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.2.0-alpha.1...android-v8.2.0-alpha.2) since [Mapbox Maps SDK for Android v8.2.0-alpha.1](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.2.0-alpha.1):
+
+### Major features
+ - Cache management API [#14962](https://github.com/mapbox/mapbox-gl-native/pull/14962)
+
+### Bug fixes
+ - Fix style change transition regression caused by delayed setting of the updated layer properties [#15016](https://github.com/mapbox/mapbox-gl-native/pull/15016)
+ 
+### Minor features and improvements
+ - Include Hiragana and Katakana glyph ranges to LocalGlyphRasterizer [#15009](https://github.com/mapbox/mapbox-gl-native/pull/15009)
+ 
+### Other Changes
+ - Update CI image with NDK r20 [#15005](https://github.com/mapbox/mapbox-gl-native/pull/15005)
+
+## 8.2.0-alpha.1 - June 26, 2019
+[Changes](https://github.com/mapbox/mapbox-gl-native/compare/android-v8.1.0...android-v8.2.0-alpha.1) since [Mapbox Maps SDK for Android v8.1.0](https://github.com/mapbox/mapbox-gl-native/releases/tag/android-v8.1.0):
+
+### Bug fixes
+ - Fix `queryRenderedFeatues` bug caused by incorrect sort feature index calculation [#14884](https://github.com/mapbox/mapbox-gl-native/pull/14884) 
+ - Fix performance regression by switching back to a more compact line attributes layout [#14851](https://github.com/mapbox/mapbox-gl-native/pull/14851)
+ - Fix a bug that restricted camera viewport after camera bounds were reset [#14882](https://github.com/mapbox/mapbox-gl-native/pull/14882)
+ - Fix a bug that ignored floating point values during core to platform color conversion [#14954](https://github.com/mapbox/mapbox-gl-native/pull/14954)
+ - Implemented asymmetric center of perspective: fixed an issue that caused the focal point to be always based on the view's horizontal center when setting [MapboxMap setPadding](https://docs.mapbox.com/android/api/map-sdk/8.0.0/com/mapbox/mapboxsdk/maps/MapboxMap.html#setPadding-int-int-int-int-). [#14664](https://github.com/mapbox/mapbox-gl-native/pull/14664)
+
+### Minor features and improvements
+ - Allow null updates to GeoJsonSource [#14898](https://github.com/mapbox/mapbox-gl-native/pull/14898)
+ 
+### Other Changes
+ - Add resource usage to HttpRequest, add offline query flag to HttpRequest [#14837](https://github.com/mapbox/mapbox-gl-native/pull/14837)
+
+## 8.1.0 - June 20, 2019
+
+### Bugs
+ - Accept floating numbers during core->platform color conversion [#14954](https://github.com/mapbox/mapbox-gl-native/pull/14954)
+ - Ensure to re-enable move when quickzoom finishes [#14965](https://github.com/mapbox/mapbox-gl-native/pull/14965)
+
+### Features
+ - Limit concurrent request for Android 4.4 and below to 10 [#14971](https://github.com/mapbox/mapbox-gl-native/pull/14971)
+
+_Note about #14971:_ This pr makes an adjustment as a precautionary measure towards a rare bug that was discovered via instrumented unit tests on Android 4.4 (aka KitKat). This bug isn’t tied to a code change in the Mapbox Maps SDK for Android. Rather, the root cause is on the Android OS (and how it interacts with OkHttp).
+
+The Maps SDK doesn’t directly communicate with this system library that the bug originates from, but goes through an external dependency that handles the http communication for the Maps SDK. Capturing from the upstream repository that the code path to this system library isn’t thread safe in Android 4.4 and can result in the native crash above. The only way to fix this issue is by upgrading the end-user device to Android 5.0 or higher which isn’t possible if the device manufacturer hasn’t released an update for it.
+
+Please see https://github.com/square/okhttp/issues/2679 for more information.
+
+## 8.1.0-beta.1 - June 13, 2019
+
+### Bugs
+ - Fix compilation warning with updated clang [#14865](https://github.com/mapbox/mapbox-gl-native/pull/14865)
+ - Fix reset behavior for setLatLngBoundsForCameraTarget [#14882](https://github.com/mapbox/mapbox-gl-native/pull/14882)
+
+### Features
+ -  Add resource usage to HttpRequest, add offline query param [#14837](https://github.com/mapbox/mapbox-gl-native/pull/14837)
+
+## 8.0.1 - June 11, 2019
+
+### Bugs
+ - Reset the native renderer only when the GL thread exits [#14841](https://github.com/mapbox/mapbox-gl-native/pull/14841)
+ - Change library loader from Relinker to SoLoader [#14890](https://github.com/mapbox/mapbox-gl-native/pull/14890)
+
+## 8.1.0-alpha.2 - June 6, 2019
+
+### Bugs
+ - Copy features array before passing them to core [#14804](https://github.com/mapbox/mapbox-gl-native/pull/14804)
+ - Improve test stability [#14853](https://github.com/mapbox/mapbox-gl-native/pull/14853)
+
+### Features
+ - Rename URL API to URI [#14836](https://github.com/mapbox/mapbox-gl-native/pull/14836)
+
+### Build
+ - Bumping Android telemetry to 4.5.1 [#14874](https://github.com/mapbox/mapbox-gl-native/pull/14874)
+
+### Docs
+ - Add external links to javadoc generation, fix warnings [#14792](https://github.com/mapbox/mapbox-gl-native/pull/14792)
+
+## 8.1.0-alpha.1 - June 3, 2019
+
+### Bugs
+ - Return color string values in the [0-255] range [#14233](https://github.com/mapbox/mapbox-gl-native/pull/14233)
+ - Resume file source to complete resources cache path change [#14546](https://github.com/mapbox/mapbox-gl-native/pull/14546)
+ - Remove binary shader support [#14707](https://github.com/mapbox/mapbox-gl-native/pull/14707)
+ - Deprecate MapboxMapOptions empty constructor [#14748](https://github.com/mapbox/mapbox-gl-native/pull/14748)
+
+
+### Features
+ - Break location camera tracking when a developer invoked animation starts [#14745](https://github.com/mapbox/mapbox-gl-native/pull/14745)
+ - Use URI instead of URL to enable asset loading [#14750](https://github.com/mapbox/mapbox-gl-native/pull/14750)
+ - Option to change the zoom rate. Decrease the default zoom rate by 35% [#14774](https://github.com/mapbox/mapbox-gl-native/pull/14774)
+ - Provide API to control eviction of cached images [#14610](https://github.com/mapbox/mapbox-gl-native/pull/14610)
+ - Android specific thread pool that keeps threads attached to JVM [#14450](https://github.com/mapbox/mapbox-gl-native/pull/14450)
+ - Asymmetric viewport when edge insets are specified [#14664](https://github.com/mapbox/mapbox-gl-native/pull/14664)
+
+### Build
+ - Update maven publishing script to enable aar packaging [#14778](https://github.com/mapbox/mapbox-gl-native/pull/14778)
+ - Do not try to package duplicate files in the publication [#14822](https://github.com/mapbox/mapbox-gl-native/pull/14822)
+
+### Docs
+ - Document that elevation(0) turns off the location shadow [#14723](https://github.com/mapbox/mapbox-gl-native/pull/14723)
+
+## 8.0.0 - May 22, 2019
+ - This release improves the method for counting monthly active users. By upgrading to this release, you are opting into the changes outlined [in this blog post](https://www.mapbox.com/52219). [#14404](https://github.com/mapbox/mapbox-gl-native/pull/14404)
 
 ## 6.8.2 - May 17, 2019
 

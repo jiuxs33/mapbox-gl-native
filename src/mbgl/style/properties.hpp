@@ -9,6 +9,8 @@
 #include <mbgl/util/indexed_tuple.hpp>
 #include <mbgl/util/ignore.hpp>
 
+#include <bitset>
+
 namespace mbgl {
 
 class GeometryTileFeature;
@@ -102,6 +104,22 @@ struct IsDataDriven : std::integral_constant<bool, P::IsDataDriven> {};
 template <class P>
 struct IsOverridable : std::integral_constant<bool, P::IsOverridable> {};
 
+template <class Ps>
+struct ConstantsMask;
+
+template <class... Ps>
+struct ConstantsMask<TypeList<Ps...>> {
+    template <class Properties>
+    static unsigned long getMask(const Properties& properties) {
+        std::bitset<sizeof... (Ps)> result;
+        util::ignore({
+            result.set(TypeIndex<Ps, Ps...>::value,
+                       properties.template get<Ps>().isConstant())...
+        });
+        return result.to_ulong();
+    }
+};
+
 template <class... Ps>
 class Properties {
 public:
@@ -151,8 +169,10 @@ public:
         }
 
         template <class T>
-        static T evaluate(float z, const GeometryTileFeature& feature,
-                          const PossiblyEvaluatedPropertyValue<T>& v, const T& defaultValue) {
+        static T evaluate(float z,
+                          const GeometryTileFeature& feature,
+                          const PossiblyEvaluatedPropertyValue<T>& v,
+                          const T& defaultValue) {
             return v.match(
                 [&] (const T& t) {
                     return t;
@@ -162,15 +182,47 @@ public:
                 });
         }
 
+        template <class T>
+        static T evaluate(float z,
+                          const GeometryTileFeature& feature,
+                          const PossiblyEvaluatedPropertyValue<T>& v,
+                          const T& defaultValue,
+                          const std::set<std::string>& availableImages) {
+            return v.match(
+                [&](const T& t) { return t; },
+                [&](const PropertyExpression<T>& t) { return t.evaluate(z, feature, availableImages, defaultValue); });
+        }
+
+        template <class T>
+        static T evaluate(float z, const GeometryTileFeature& feature, const FeatureState& state,
+                          const PossiblyEvaluatedPropertyValue<T>& v, const T& defaultValue) {
+            return v.match([&](const T& t) { return t; },
+                           [&](const PropertyExpression<T>& t) { return t.evaluate(z, feature, state, defaultValue); });
+        }
+
         template <class P>
         auto evaluate(float z, const GeometryTileFeature& feature) const {
             return evaluate(z, feature, this->template get<P>(), P::defaultValue());
+        }
+
+        template <class P>
+        auto evaluate(float z, const GeometryTileFeature& feature, const FeatureState& state) const {
+            return evaluate(z, feature, state, this->template get<P>(), P::defaultValue());
+        }
+
+        template <class P>
+        auto evaluate(float z, const GeometryTileFeature& feature, const std::set<std::string>& availableImages) const {
+            return evaluate(z, feature, this->template get<P>(), P::defaultValue(), availableImages);
         }
 
         Evaluated evaluate(float z, const GeometryTileFeature& feature) const {
             return Evaluated {
                 evaluate<Ps>(z, feature)...
             };
+        }
+
+        unsigned long constantsMask() const {
+            return ConstantsMask<DataDrivenProperties>::getMask(*this);
         }
     };
 

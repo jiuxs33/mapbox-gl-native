@@ -2,7 +2,7 @@
 #include <mbgl/test/stub_file_source.hpp>
 #include <mbgl/test/map_adapter.hpp>
 
-#include <mbgl/gl/headless_frontend.hpp>
+#include <mbgl/gfx/headless_frontend.hpp>
 #include <mbgl/map/map_options.hpp>
 #include <mbgl/gfx/backend_scope.hpp>
 #include <mbgl/style/layers/symbol_layer.hpp>
@@ -45,10 +45,10 @@ TEST(API, RecycleMapUpdateImages) {
     // default marker
 
     loadStyle("default_marker", "test/fixtures/sprites/default_marker.png");
-    test::checkImage("test/fixtures/recycle_map/default_marker", frontend.render(*map), 0.0006, 0.1);
+    test::checkImage("test/fixtures/recycle_map/default_marker", frontend.render(*map).image, 0.0006, 0.1);
 
     // flipped marker
 
     loadStyle("flipped_marker", "test/fixtures/sprites/flipped_marker.png");
-    test::checkImage("test/fixtures/recycle_map/flipped_marker", frontend.render(*map), 0.0006, 0.1);
+    test::checkImage("test/fixtures/recycle_map/flipped_marker", frontend.render(*map).image, 0.0006, 0.1);
 }

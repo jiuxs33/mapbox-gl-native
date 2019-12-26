@@ -1,5 +1,3 @@
-add_vendor_target(gtest STATIC)
-
 # scripts/generate-file-lists.js to change the source files for this target.
 load_sources_list(MBGL_TEST_FILES test/test-files.json)
 if (MBGL_TEST_TARGET_TYPE STREQUAL "library")
@@ -25,11 +23,12 @@ target_include_directories(mbgl-test
 )
 
 target_link_libraries(mbgl-test PRIVATE
-    gtest
+    mbgl-vendor-googletest
+    Mapbox::Base::Extras::args
     mbgl-core
-    shelf-pack-cpp
-    unique_resource
-    pixelmatch-cpp
+    mbgl-vendor-shelf-pack-cpp
+    mbgl-vendor-unique_resource
+    Mapbox::Base::pixelmatch-cpp
 )
 
 mbgl_platform_test()

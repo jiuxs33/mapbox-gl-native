@@ -1,3 +1,5 @@
+// clang-format off
+
 // This file is generated. Edit scripts/generate-style-code.js, then run `make style-code`.
 
 #pragma once
@@ -34,6 +36,11 @@ struct LineRoundLimit : LayoutProperty<float> {
     static float defaultValue() { return 1; }
 };
 
+struct LineSortKey : DataDrivenLayoutProperty<float> {
+    static constexpr const char *name() { return "line-sort-key"; }
+    static float defaultValue() { return 0; }
+};
+
 struct LineBlur : DataDrivenPaintProperty<float, attributes::blur, uniforms::blur> {
     static float defaultValue() { return 0; }
 };
@@ -43,7 +50,7 @@ struct LineColor : DataDrivenPaintProperty<Color, attributes::color, uniforms::c
 };
 
 struct LineDasharray : CrossFadedPaintProperty<std::vector<float>> {
-    static std::vector<float> defaultValue() { return {  }; }
+    static std::vector<float> defaultValue() { return {}; }
 };
 
 struct LineFloorWidth : DataDrivenPaintProperty<float, attributes::floorwidth, uniforms::floorwidth> {
@@ -66,12 +73,12 @@ struct LineOpacity : DataDrivenPaintProperty<float, attributes::opacity, uniform
     static float defaultValue() { return 1; }
 };
 
-struct LinePattern : CrossFadedDataDrivenPaintProperty<std::string, attributes::pattern_to, uniforms::pattern_to, attributes::pattern_from, uniforms::pattern_from> {
-    static std::string defaultValue() { return ""; }
+struct LinePattern : CrossFadedDataDrivenPaintProperty<expression::Image, attributes::pattern_to, uniforms::pattern_to, attributes::pattern_from, uniforms::pattern_from> {
+    static expression::Image defaultValue() { return {}; }
 };
 
 struct LineTranslate : PaintProperty<std::array<float, 2>> {
-    static std::array<float, 2> defaultValue() { return {{ 0, 0 }}; }
+    static std::array<float, 2> defaultValue() { return {{0, 0}}; }
 };
 
 struct LineTranslateAnchor : PaintProperty<TranslateAnchorType> {
@@ -86,7 +93,8 @@ class LineLayoutProperties : public Properties<
     LineCap,
     LineJoin,
     LineMiterLimit,
-    LineRoundLimit
+    LineRoundLimit,
+    LineSortKey
 > {};
 
 class LinePaintProperties : public Properties<
@@ -113,6 +121,8 @@ public:
         LinePaintProperties::PossiblyEvaluated);
     ~LineLayerProperties() override;
 
+    unsigned long constantsMask() const override;
+
     const LineLayer::Impl& layerImpl() const;
     // Data members.
     CrossfadeParameters crossfade;
@@ -121,3 +131,5 @@ public:
 
 } // namespace style
 } // namespace mbgl
+
+// clang-format on

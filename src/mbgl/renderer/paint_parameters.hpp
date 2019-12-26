@@ -2,7 +2,9 @@
 
 #include <mbgl/renderer/render_pass.hpp>
 #include <mbgl/renderer/render_light.hpp>
+#include <mbgl/renderer/render_source.hpp>
 #include <mbgl/map/mode.hpp>
+#include <mbgl/map/transform_state.hpp>
 #include <mbgl/gfx/depth_mode.hpp>
 #include <mbgl/gfx/stencil_mode.hpp>
 #include <mbgl/gfx/color_mode.hpp>
@@ -20,9 +22,8 @@ class Programs;
 class TransformState;
 class ImageManager;
 class LineAtlas;
+class PatternAtlas;
 class UnwrappedTileID;
-class RenderSource;
-class RenderTile;
 
 namespace gfx {
 class Context;
@@ -31,29 +32,43 @@ class CommandEncoder;
 class RenderPass;
 } // namespace gfx
 
+
+class TransformParameters {
+public:
+    TransformParameters(const TransformState&);
+    mat4 projMatrix;
+    mat4 alignedProjMatrix;
+    mat4 nearClippedProjMatrix;
+    const TransformState state;
+};
+
 class PaintParameters {
 public:
     PaintParameters(gfx::Context&,
                     float pixelRatio,
                     gfx::RendererBackend&,
-                    const UpdateParameters&,
                     const EvaluatedLight&,
+                    MapMode,
+                    MapDebugOptions,
+                    TimePoint,
+                    const TransformParameters&,
                     RenderStaticData&,
-                    ImageManager&,
-                    LineAtlas&);
+                    LineAtlas&,
+                    PatternAtlas&);
     ~PaintParameters();
 
     gfx::Context& context;
     gfx::RendererBackend& backend;
-    const std::unique_ptr<gfx::CommandEncoder> encoder;
+    std::unique_ptr<gfx::CommandEncoder> encoder;
     std::unique_ptr<gfx::RenderPass> renderPass;
 
+    const TransformParameters& transformParams;
     const TransformState& state;
     const EvaluatedLight& evaluatedLight;
 
     RenderStaticData& staticData;
-    ImageManager& imageManager;
     LineAtlas& lineAtlas;
+    PatternAtlas& patternAtlas;
 
     RenderPass pass = RenderPass::Opaque;
     MapMode mapMode;
@@ -71,13 +86,9 @@ public:
 
     mat4 matrixForTile(const UnwrappedTileID&, bool aligned = false) const;
 
-    mat4 projMatrix;
-    mat4 alignedProjMatrix;
-    mat4 nearClippedProjMatrix;
-
     // Stencil handling
 public:
-    void renderTileClippingMasks(const std::vector<std::reference_wrapper<RenderTile>>&);
+    void renderTileClippingMasks(const RenderTiles&);
     gfx::StencilMode stencilModeForClipping(const UnwrappedTileID&) const;
     gfx::StencilMode stencilModeFor3D();
 
@@ -93,8 +104,7 @@ public:
     uint32_t currentLayer;
     float depthRangeSize;
     const float depthEpsilon = 1.0f / (1 << 16);
-
-
+    uint32_t opaquePassCutoff = 0;
     float symbolFadeChange;
 };
 

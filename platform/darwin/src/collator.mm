@@ -1,12 +1,11 @@
-#include <mbgl/style/expression/collator.hpp>
+#include <mbgl/i18n/collator.hpp>
 
 #include <sstream>
 
 #import <Foundation/Foundation.h>
 
 namespace mbgl {
-namespace style {
-namespace expression {
+namespace platform {
 
 class Collator::Impl {
 public:
@@ -31,7 +30,7 @@ public:
         // https://developer.apple.com/documentation/foundation/nsstring/1414561-compare
         NSRange compareRange = NSMakeRange(0, nsLhs.length);
 
-        return [nsLhs compare:nsRhs options:options range:compareRange locale:locale];
+        return static_cast<int>([nsLhs compare:nsRhs options:options range:compareRange locale:locale]);
     }
 
     std::string resolvedLocale() const {
@@ -47,7 +46,6 @@ private:
     NSStringCompareOptions options;
     NSLocale* locale;
 };
-
 
 Collator::Collator(bool caseSensitive, bool diacriticSensitive, optional<std::string> locale_)
     : impl(std::make_shared<Impl>(caseSensitive, diacriticSensitive, std::move(locale_)))
@@ -65,6 +63,5 @@ std::string Collator::resolvedLocale() const {
     return impl->resolvedLocale();
 }
 
-} // namespace expression
-} // namespace style
+} // namespace platform
 } // namespace mbgl

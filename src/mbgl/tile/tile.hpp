@@ -24,9 +24,11 @@ class LayerRenderData;
 class TransformState;
 class TileObserver;
 class RenderLayer;
+class TileRenderData;
 class RenderedQueryOptions;
 class SourceQueryOptions;
 class CollisionIndex;
+class SourceFeatureState;
 
 namespace gfx {
 class UploadPass;
@@ -45,6 +47,8 @@ public:
     Tile(Kind, OverscaledTileID);
     virtual ~Tile();
 
+    virtual std::unique_ptr<TileRenderData> createRenderData() = 0;
+
     void setObserver(TileObserver* observer);
 
     virtual void setNecessity(TileNecessity) {}
@@ -52,39 +56,29 @@ public:
     // Mark this tile as no longer needed and cancel any pending work.
     virtual void cancel();
 
-    virtual void upload(gfx::UploadPass&) = 0;
-    virtual Bucket* getBucket(const style::Layer::Impl&) const = 0;
-    virtual const LayerRenderData* getLayerRenderData(const style::Layer::Impl&) const {
-        assert(false);
-        return nullptr;
-    }
-    // Updates the contained layer render data with the given properties.
+    // Notifies this tile of the updated layer properties.
+    //
+    // Tile implementation should update the contained layer
+    // render data with the given properties.
+    // 
     // Returns `true` if the corresponding render layer data is present in this tile (and i.e. it
     // was succesfully updated); returns `false` otherwise.
-    virtual bool updateLayerProperties(const Immutable<style::LayerProperties>&) { return true; }
-
-    template <class T>
-    T* getBucket(const style::Layer::Impl& layer) const {
-        return static_cast<T*>(getBucket(layer));
-    }
-
+    virtual bool layerPropertiesUpdated(const Immutable<style::LayerProperties>& layerProperties) = 0;
     virtual void setShowCollisionBoxes(const bool) {}
     virtual void setLayers(const std::vector<Immutable<style::LayerProperties>>&) {}
     virtual void setMask(TileMask&&) {}
 
-    virtual void queryRenderedFeatures(
-            std::unordered_map<std::string, std::vector<Feature>>& result,
-            const GeometryCoordinates& queryGeometry,
-            const TransformState&,
-            const std::vector<const RenderLayer*>&,
-            const RenderedQueryOptions& options,
-            const mat4& projMatrix);
+    virtual void queryRenderedFeatures(std::unordered_map<std::string, std::vector<Feature>>& result,
+                                       const GeometryCoordinates& queryGeometry, const TransformState&,
+                                       const std::unordered_map<std::string, const RenderLayer*>&,
+                                       const RenderedQueryOptions& options, const mat4& projMatrix,
+                                       const SourceFeatureState& featureState);
 
     virtual void querySourceFeatures(
             std::vector<Feature>& result,
             const SourceQueryOptions&);
 
-    virtual float getQueryPadding(const std::vector<const RenderLayer*>&);
+    virtual float getQueryPadding(const std::unordered_map<std::string, const RenderLayer*>&);
 
     void setTriedCache();
 
@@ -130,19 +124,25 @@ public:
     // We hold onto a tile for two placements: fading starts with the first placement
     // and will have time to finish by the second placement.
     virtual void performedFadePlacement() {}
-    
+
+    virtual void setFeatureState(const LayerFeatureStates&) {}
+
     void dumpDebugLogs() const;
 
     const Kind kind;
     OverscaledTileID id;
     optional<Timestamp> modified;
     optional<Timestamp> expires;
+    // Indicates whether this tile is used for the currently visible layers on the map.
+    // Re-initialized at every source update.
+    bool usedByRenderedLayers = false;
 
 protected:
     bool triedOptional = false;
     bool renderable = false;
     bool pending = false;
     bool loaded = false;
+
 
     TileObserver* observer = nullptr;
 };

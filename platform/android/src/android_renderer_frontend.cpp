@@ -42,8 +42,8 @@ public:
         delegate.invoke(&RendererObserver::onWillStartRenderingFrame);
     }
 
-    void onDidFinishRenderingFrame(RenderMode mode, bool repaintNeeded) override {
-        delegate.invoke(&RendererObserver::onDidFinishRenderingFrame, mode, repaintNeeded);
+    void onDidFinishRenderingFrame(RenderMode mode, bool repaintNeeded, bool placementChanged) override {
+        delegate.invoke(&RendererObserver::onDidFinishRenderingFrame, mode, repaintNeeded, placementChanged);
     }
 
     void onDidFinishRenderingMap() override {
@@ -52,6 +52,10 @@ public:
 
     void onStyleImageMissing(const std::string& id, StyleImageMissingCallback done) override {
         delegate.invoke(&RendererObserver::onStyleImageMissing, id, done);
+    }
+
+    void onRemoveUnusedStyleImages(const std::vector<std::string>& ids) override {
+        delegate.invoke(&RendererObserver::onRemoveUnusedStyleImages, ids);
     }
 
 private:

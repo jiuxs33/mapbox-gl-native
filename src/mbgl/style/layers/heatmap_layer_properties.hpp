@@ -1,3 +1,5 @@
+// clang-format off
+
 // This file is generated. Edit scripts/generate-style-code.js, then run `make style-code`.
 
 #pragma once
@@ -49,6 +51,8 @@ public:
         HeatmapPaintProperties::PossiblyEvaluated);
     ~HeatmapLayerProperties() override;
 
+    unsigned long constantsMask() const override;
+
     const HeatmapLayer::Impl& layerImpl() const;
     // Data members.
     HeatmapPaintProperties::PossiblyEvaluated evaluated;
@@ -56,3 +60,5 @@ public:
 
 } // namespace style
 } // namespace mbgl
+
+// clang-format on

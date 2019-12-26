@@ -1,19 +1,22 @@
 #include <mbgl/renderer/render_tile.hpp>
+
 #include <mbgl/renderer/paint_parameters.hpp>
 #include <mbgl/renderer/buckets/debug_bucket.hpp>
+#include <mbgl/renderer/render_source.hpp>
 #include <mbgl/renderer/render_static_data.hpp>
+#include <mbgl/renderer/tile_render_data.hpp>
 #include <mbgl/programs/programs.hpp>
 #include <mbgl/map/transform_state.hpp>
 #include <mbgl/gfx/cull_face_mode.hpp>
 #include <mbgl/tile/tile.hpp>
+#include <mbgl/tile/geometry_tile.hpp>
 #include <mbgl/util/math.hpp>
 
 namespace mbgl {
 
 using namespace style;
 
-RenderTile::RenderTile(UnwrappedTileID id_, Tile& tile_) : id(std::move(id_)), tile(tile_) {
-}
+RenderTile::RenderTile(UnwrappedTileID id_, Tile& tile_) : id(id_), tile(tile_) {}
 
 RenderTile::~RenderTile() = default;
 
@@ -58,19 +61,50 @@ mat4 RenderTile::translatedClipMatrix(const std::array<float, 2>& translation,
     return translateVtxMatrix(nearClippedMatrix, translation, anchor, state, false);
 }
 
-void RenderTile::setMask(TileMask&& mask) {
-    tile.setMask(std::move(mask));
+const OverscaledTileID& RenderTile::getOverscaledTileID() const { return tile.id; }
+bool RenderTile::holdForFade() const { return tile.holdForFade(); }
+
+Bucket* RenderTile::getBucket(const style::Layer::Impl& impl) const {
+    assert(renderData);
+    return renderData->getBucket(impl);
 }
 
-void RenderTile::upload(gfx::UploadPass& uploadPass) {
-    tile.upload(uploadPass);
+const LayerRenderData* RenderTile::getLayerRenderData(const style::Layer::Impl& impl) const {
+    assert(renderData);
+    return renderData->getLayerRenderData(impl);
+}
+
+optional<ImagePosition> RenderTile::getPattern(const std::string& pattern) const {
+    assert(renderData);
+    return renderData->getPattern(pattern);
+}
+
+const gfx::Texture& RenderTile::getGlyphAtlasTexture() const {
+    assert(renderData);
+    return renderData->getGlyphAtlasTexture();
+}
+
+const gfx::Texture& RenderTile::getIconAtlasTexture() const {
+    assert(renderData);
+    return renderData->getIconAtlasTexture();
+}
+
+void RenderTile::upload(gfx::UploadPass& uploadPass) const {
+    assert(renderData);
+    renderData->upload(uploadPass);
 
     if (debugBucket) {
         debugBucket->upload(uploadPass);
     }
 }
 
-void RenderTile::prepare(PaintParameters& parameters) {
+void RenderTile::prepare(const SourcePrepareParameters& parameters) {
+    renderData = tile.createRenderData();
+    assert(renderData);
+    renderData->prepare(parameters);
+
+    needsRendering = tile.usedByRenderedLayers;
+
     if (parameters.debugOptions != MapDebugOptions::NoDebug &&
         (!debugBucket || debugBucket->renderable != tile.isRenderable() ||
          debugBucket->complete != tile.isComplete() ||
@@ -85,15 +119,16 @@ void RenderTile::prepare(PaintParameters& parameters) {
     }
 
     // Calculate two matrices for this tile: matrix is the standard tile matrix; nearClippedMatrix
-    // clips the near plane to 100 to save depth buffer precision
-    parameters.state.matrixFor(matrix, id);
-    parameters.state.matrixFor(nearClippedMatrix, id);
-    matrix::multiply(matrix, parameters.projMatrix, matrix);
-    matrix::multiply(nearClippedMatrix, parameters.nearClippedProjMatrix, nearClippedMatrix);
+    // has near plane moved further, to enhance depth buffer precision
+    const auto& transform = parameters.transform;
+    transform.state.matrixFor(matrix, id);
+    transform.state.matrixFor(nearClippedMatrix, id);
+    matrix::multiply(matrix, transform.projMatrix, matrix);
+    matrix::multiply(nearClippedMatrix, transform.nearClippedProjMatrix, nearClippedMatrix);
 }
 
-void RenderTile::finishRender(PaintParameters& parameters) {
-    if (!used || parameters.debugOptions == MapDebugOptions::NoDebug)
+void RenderTile::finishRender(PaintParameters& parameters) const {
+    if (!needsRendering || parameters.debugOptions == MapDebugOptions::NoDebug)
         return;
 
     static const style::Properties<>::PossiblyEvaluated properties {};
@@ -188,6 +223,10 @@ void RenderTile::finishRender(PaintParameters& parameters) {
             "__debug/" + debugBucket->drawScopeID
         );
     }
+}
+
+void RenderTile::setFeatureState(const LayerFeatureStates& states) {
+    tile.setFeatureState(states);
 }
 
 } // namespace mbgl

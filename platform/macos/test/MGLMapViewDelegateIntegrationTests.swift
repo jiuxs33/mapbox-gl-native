@@ -28,6 +28,8 @@ extension MGLMapViewDelegateIntegrationTests: MGLMapViewDelegate {
     func mapViewDidBecomeIdle(_ mapView: MGLMapView) {}
 
     func mapViewDidFailLoadingMap(_ mapView: MGLMapView, withError error: Error) {}
+
+    func mapView(_ mapView: MGLMapView, didFailToLoadImage imageName: String) -> NSImage? { return nil }
     
     func mapView(_ mapView: MGLMapView, shapeAnnotationIsEnabled annotation: MGLShape) -> Bool { return false }
 
@@ -57,4 +59,5 @@ extension MGLMapViewDelegateIntegrationTests: MGLMapViewDelegate {
 
     func mapView(_ mapView: MGLMapView, calloutViewControllerFor annotation: MGLAnnotation) -> NSViewController? { return nil }
 
+    func mapView(_ mapView: MGLMapView, shouldRemoveStyleImage imageName: String) -> Bool { return false }
 }

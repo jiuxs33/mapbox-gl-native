@@ -14,9 +14,14 @@ namespace mbgl {
 
 using namespace style;
 
+namespace {
+
 inline const CustomLayer::Impl& impl(const Immutable<style::Layer::Impl>& impl) {
+    assert(impl->getTypeInfo() == CustomLayer::Impl::staticTypeInfo());
     return static_cast<const CustomLayer::Impl&>(*impl);
 }
+
+} // namespace
 
 RenderCustomLayer::RenderCustomLayer(Immutable<style::CustomLayer::Impl> _impl)
     : RenderLayer(makeMutable<CustomLayerProperties>(std::move(_impl))),
@@ -50,7 +55,10 @@ void RenderCustomLayer::markContextDestroyed() {
     contextDestroyed = true;
 }
 
-void RenderCustomLayer::render(PaintParameters& paintParameters, RenderSource*) {
+void RenderCustomLayer::prepare(const LayerPrepareParameters&) {
+}
+
+void RenderCustomLayer::render(PaintParameters& paintParameters) {
     if (host != impl(baseImpl).host) {
         //If the context changed, deinitialize the previous one before initializing the new one.
         if (host && !contextDestroyed) {

@@ -1,5 +1,4 @@
 #include <mbgl/programs/symbol_program.hpp>
-#include <mbgl/gfx/context_impl.hpp>
 #include <mbgl/renderer/render_tile.hpp>
 #include <mbgl/map/transform_state.hpp>
 #include <mbgl/style/layers/symbol_layer_impl.hpp>
@@ -9,10 +8,6 @@
 #include <mbgl/math/clamp.hpp>
 
 namespace mbgl {
-
-template std::unique_ptr<gfx::Program<SymbolIconProgram>> gfx::Context::createProgram(const ProgramParameters&);
-template std::unique_ptr<gfx::Program<SymbolSDFTextProgram>> gfx::Context::createProgram(const ProgramParameters&);
-template std::unique_ptr<gfx::Program<SymbolSDFIconProgram>> gfx::Context::createProgram(const ProgramParameters&);
 
 using namespace style;
 
@@ -66,13 +61,13 @@ Values makeValues(const bool isText,
     const bool pitchWithMap = values.pitchAlignment == style::AlignmentType::Map;
     const bool rotateWithMap = values.rotationAlignment == style::AlignmentType::Map;
 
-    // Line label rotation happens in `updateLineLabels`
+    // Line label rotation happens in `updateLineLabels`/`reprojectLineLabels``
     // Pitched point labels are automatically rotated by the labelPlaneMatrix projection
     // Unpitched point labels need to have their rotation applied after projection
     const bool rotateInShader = rotateWithMap && !pitchWithMap && !alongLine;
 
     mat4 labelPlaneMatrix;
-    if (alongLine || (isText && hasVariablePacement)) {
+    if (alongLine || hasVariablePacement) {
         // For labels that follow lines the first part of the projection is handled on the cpu.
         // Pass an identity matrix because no transformation needs to be done in the vertex shader.
         matrix::identity(labelPlaneMatrix);
@@ -159,6 +154,33 @@ SymbolSDFProgram<Name, PaintProperties>::layoutUniformValues(const bool isText,
         uniforms::device_pixel_ratio::Value( pixelRatio ),
         uniforms::is_halo::Value( part == SymbolSDFPart::Halo )
     );
+}
+
+SymbolTextAndIconProgram::LayoutUniformValues SymbolTextAndIconProgram::layoutUniformValues(
+    const bool hasVariablePacement,
+    const style::SymbolPropertyValues& values,
+    const Size& texsize,
+    const Size& texsize_icon,
+    const std::array<float, 2>& pixelsToGLUnits,
+    const float pixelRatio,
+    const bool alongLine,
+    const RenderTile& tile,
+    const TransformState& state,
+    const float symbolFadeChange,
+    const SymbolSDFPart part) {
+    return SymbolTextAndIconProgram::LayoutUniformValues(
+        SymbolSDFProgram<SymbolSDFTextProgram, style::TextPaintProperties>::layoutUniformValues(true,
+                                                                                                hasVariablePacement,
+                                                                                                values,
+                                                                                                texsize,
+                                                                                                pixelsToGLUnits,
+                                                                                                pixelRatio,
+                                                                                                alongLine,
+                                                                                                tile,
+                                                                                                state,
+                                                                                                symbolFadeChange,
+                                                                                                part)
+            .concat(gfx::UniformValues<SymbolTextAndIconProgramUniforms>(uniforms::texsize::Value(texsize_icon))));
 }
 
 template class SymbolSDFProgram<SymbolSDFIconProgram, style::IconPaintProperties>;

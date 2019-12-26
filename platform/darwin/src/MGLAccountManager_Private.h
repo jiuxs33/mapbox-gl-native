@@ -2,6 +2,9 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+/// NSUserDefaults key that controls developer account type
+FOUNDATION_EXTERN NSString * const MGLMapboxAccountTypeKey;
+
 @interface MGLAccountManager (Private)
 
 /// Returns the shared instance of the `MGLAccountManager` class.
@@ -15,8 +18,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 #if TARGET_OS_IPHONE || TARGET_OS_SIMULATOR
 /// The current global SKU.
-@property (class, atomic, readonly, nullable) NSString *skuToken;
-@property (class, nonatomic, readonly) BOOL isAccountsSDKEnabled;
+@property (class, atomic, readonly) NSString *skuToken;
 #endif
 
 @end

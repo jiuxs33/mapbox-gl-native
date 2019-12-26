@@ -1,5 +1,5 @@
 // NOTE: DO NOT CHANGE THIS FILE. IT IS AUTOMATICALLY GENERATED.
-
+// clang-format off
 #include <mbgl/programs/collision_box_program.hpp>
 #include <mbgl/programs/gl/preludes.hpp>
 #include <mbgl/programs/gl/shader_source.hpp>
@@ -15,7 +15,7 @@ struct ShaderSource;
 template <>
 struct ShaderSource<CollisionBoxProgram> {
     static constexpr const char* name = "collision_box";
-    static constexpr const uint8_t hash[8] = { 0xcb, 0x6a, 0x9b, 0xd1, 0x1f, 0x31, 0xf8, 0x5b };
+    static constexpr const uint8_t hash[8] = {0xcb, 0x6a, 0x9b, 0xd1, 0x1f, 0x31, 0xf8, 0x5b};
     static constexpr const auto vertexOffset = 10000;
     static constexpr const auto fragmentOffset = 10679;
 };
@@ -29,8 +29,8 @@ constexpr const uint8_t ShaderSource<CollisionBoxProgram>::hash[8];
 namespace gfx {
 
 template <>
-std::unique_ptr<Program<CollisionBoxProgram>>
-Context::createProgram<gl::Context>(const ProgramParameters& programParameters) {
+std::unique_ptr<gfx::Program<CollisionBoxProgram>>
+Backend::Create<gfx::Backend::Type::OpenGL>(const ProgramParameters& programParameters) {
     return std::make_unique<gl::Program<CollisionBoxProgram>>(programParameters);
 }
 
@@ -93,4 +93,4 @@ void main() {
     }
 }
 */
-
+// clang-format on

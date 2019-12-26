@@ -6,6 +6,8 @@
 
 namespace mbgl {
 
+class ImageSourceRenderData;
+
 class RenderRasterLayer final : public RenderLayer {
 public:
     explicit RenderRasterLayer(Immutable<style::RasterLayer::Impl>);
@@ -16,11 +18,12 @@ private:
     void evaluate(const PropertyEvaluationParameters&) override;
     bool hasTransition() const override;
     bool hasCrossfade() const override;
-
-    void render(PaintParameters&, RenderSource*) override;
+    void prepare(const LayerPrepareParameters&) override;
+    void render(PaintParameters&) override;
 
     // Paint properties
     style::RasterPaintProperties::Unevaluated unevaluated;
+    const ImageSourceRenderData* imageData = nullptr;
 };
 
 } // namespace mbgl

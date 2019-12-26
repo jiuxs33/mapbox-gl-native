@@ -124,7 +124,7 @@ bool Map::isPanning() const {
 
 #pragma mark -
 
-CameraOptions Map::getCameraOptions(const EdgeInsets& padding) const {
+CameraOptions Map::getCameraOptions(optional<EdgeInsets> padding) const {
     return impl->transform.getCameraOptions(padding);
 }
 
@@ -182,13 +182,12 @@ CameraOptions cameraForLatLngs(const std::vector<LatLng>& latLngs, const Transfo
     // Calculate the bounds of the possibly rotated shape with respect to the viewport.
     ScreenCoordinate nePixel = {-INFINITY, -INFINITY};
     ScreenCoordinate swPixel = {INFINITY, INFINITY};
-    double viewportHeight = size.height;
     for (LatLng latLng : latLngs) {
         ScreenCoordinate pixel = transform.latLngToScreenCoordinate(latLng);
         swPixel.x = std::min(swPixel.x, pixel.x);
         nePixel.x = std::max(nePixel.x, pixel.x);
-        swPixel.y = std::min(swPixel.y, viewportHeight - pixel.y);
-        nePixel.y = std::max(nePixel.y, viewportHeight - pixel.y);
+        swPixel.y = std::min(swPixel.y, pixel.y);
+        nePixel.y = std::max(nePixel.y, pixel.y);
     }
     double width = nePixel.x - swPixel.x;
     double height = nePixel.y - swPixel.y;
@@ -212,21 +211,12 @@ CameraOptions cameraForLatLngs(const std::vector<LatLng>& latLngs, const Transfo
 
     // Calculate the center point of a virtual bounds that is extended in all directions by padding.
     ScreenCoordinate centerPixel = nePixel + swPixel;
-    ScreenCoordinate paddedNEPixel = {
-        padding.right() / minScale,
-        padding.top() / minScale,
-    };
-    ScreenCoordinate paddedSWPixel = {
-        padding.left() / minScale,
-        padding.bottom() / minScale,
-    };
-    centerPixel = centerPixel + paddedNEPixel - paddedSWPixel;
     centerPixel /= 2.0;
 
-    // CameraOptions origin is at the top-left corner.
-    centerPixel.y = viewportHeight - centerPixel.y;
-
-    return CameraOptions().withCenter(transform.screenCoordinateToLatLng(centerPixel)).withZoom(zoom);
+    return CameraOptions()
+        .withCenter(transform.screenCoordinateToLatLng(centerPixel))
+        .withPadding(padding)
+        .withZoom(zoom);
 }
 
 CameraOptions Map::cameraForLatLngs(const std::vector<LatLng>& latLngs, const EdgeInsets& padding, optional<double> bearing, optional<double> pitch) const {
@@ -364,6 +354,24 @@ LatLng Map::latLngForPixel(const ScreenCoordinate& pixel) const {
     return impl->transform.screenCoordinateToLatLng(pixel);
 }
 
+std::vector<ScreenCoordinate> Map::pixelsForLatLngs(const std::vector<LatLng>& latLngs) const {
+    std::vector<ScreenCoordinate> ret;
+    ret.reserve(latLngs.size());
+    for (const auto& latLng : latLngs) {
+        ret.emplace_back(pixelForLatLng(latLng));
+    }
+    return ret;
+}
+
+std::vector<LatLng> Map::latLngsForPixels(const std::vector<ScreenCoordinate>& screenCoords) const {
+    std::vector<LatLng> ret;
+    ret.reserve(screenCoords.size());
+    for (const auto& point : screenCoords) {
+        ret.emplace_back(latLngForPixel(point));
+    }
+    return ret;
+}
+
 #pragma mark - Annotations
 
 void Map::addAnnotationImage(std::unique_ptr<style::Image> image) {
@@ -413,30 +421,6 @@ void Map::removeAnnotation(AnnotationID annotation) {
 
 void Map::setDebug(MapDebugOptions debugOptions) {
     impl->debugOptions = debugOptions;
-    impl->onUpdate();
-}
-
-void Map::cycleDebugOptions() {
-#if not MBGL_USE_GLES2
-    if (impl->debugOptions & MapDebugOptions::StencilClip)
-        impl->debugOptions = MapDebugOptions::NoDebug;
-    else if (impl->debugOptions & MapDebugOptions::Overdraw)
-        impl->debugOptions = MapDebugOptions::StencilClip;
-#else
-    if (impl->debugOptions & MapDebugOptions::Overdraw)
-        impl->debugOptions = MapDebugOptions::NoDebug;
-#endif // MBGL_USE_GLES2
-    else if (impl->debugOptions & MapDebugOptions::Collision)
-        impl->debugOptions = MapDebugOptions::Overdraw;
-    else if (impl->debugOptions & MapDebugOptions::Timestamps)
-        impl->debugOptions = impl->debugOptions | MapDebugOptions::Collision;
-    else if (impl->debugOptions & MapDebugOptions::ParseStatus)
-        impl->debugOptions = impl->debugOptions | MapDebugOptions::Timestamps;
-    else if (impl->debugOptions & MapDebugOptions::TileBorders)
-        impl->debugOptions = impl->debugOptions | MapDebugOptions::ParseStatus;
-    else
-        impl->debugOptions = MapDebugOptions::TileBorders;
-
     impl->onUpdate();
 }
 

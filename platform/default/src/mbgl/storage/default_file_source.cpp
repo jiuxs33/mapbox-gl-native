@@ -20,10 +20,10 @@ namespace mbgl {
 
 class DefaultFileSource::Impl {
 public:
-    Impl(std::shared_ptr<FileSource> assetFileSource_, std::string cachePath, uint64_t maximumCacheSize)
+    Impl(std::shared_ptr<FileSource> assetFileSource_, std::string cachePath)
             : assetFileSource(std::move(assetFileSource_))
             , localFileSource(std::make_unique<LocalFileSource>())
-            , offlineDatabase(std::make_unique<OfflineDatabase>(cachePath, maximumCacheSize)) {
+            , offlineDatabase(std::make_unique<OfflineDatabase>(std::move(cachePath))) {
     }
 
     void setAPIBaseURL(const std::string& url) {
@@ -46,8 +46,11 @@ public:
         onlineFileSource.setResourceTransform(std::move(transform));
     }
 
-    void setResourceCachePath(const std::string& path) {
+    void setResourceCachePath(const std::string& path, optional<ActorRef<PathChangeCallback>>&& callback) {
         offlineDatabase->changePath(path);
+        if (callback) {
+            callback->invoke(&PathChangeCallback::operator());
+        }
     }
 
     void listRegions(std::function<void (expected<OfflineRegions, std::exception_ptr>)> callback) {
@@ -79,9 +82,13 @@ public:
         }
     }
 
-    void deleteRegion(OfflineRegion&& region, std::function<void (std::exception_ptr)> callback) {
+    void deleteRegion(OfflineRegion&& region, std::function<void(std::exception_ptr)> callback) {
         downloads.erase(region.getID());
         callback(offlineDatabase->deleteRegion(std::move(region)));
+    }
+
+    void invalidateRegion(int64_t regionID, std::function<void (std::exception_ptr)> callback) {
+        callback(offlineDatabase->invalidateRegion(regionID));
     }
 
     void setRegionObserver(int64_t regionID, std::unique_ptr<OfflineRegionObserver> observer) {
@@ -138,6 +145,8 @@ public:
 
                     if (offlineResponse->isUsable()) {
                         callback(*offlineResponse);
+                        // Set the priority of existing resource to low if it's expired but usable.
+                        resource.setPriority(Resource::Priority::Low);
                     }
                 }
             }
@@ -173,13 +182,33 @@ public:
         onlineFileSource.setOnlineStatus(status);
     }
 
+    void setMaximumConcurrentRequests(uint32_t maximumConcurrentRequests_) {
+        onlineFileSource.setMaximumConcurrentRequests(maximumConcurrentRequests_);
+    }
+
     void put(const Resource& resource, const Response& response) {
         offlineDatabase->put(resource, response);
     }
 
-    void resetCache(std::function<void (std::exception_ptr)> callback) {
-        callback(offlineDatabase->resetCache());
+    void resetDatabase(std::function<void (std::exception_ptr)> callback) {
+        callback(offlineDatabase->resetDatabase());
     }
+
+    void invalidateAmbientCache(std::function<void (std::exception_ptr)> callback) {
+        callback(offlineDatabase->invalidateAmbientCache());
+    }
+
+    void clearAmbientCache(std::function<void (std::exception_ptr)> callback) {
+        callback(offlineDatabase->clearAmbientCache());
+    }
+
+    void setMaximumAmbientCacheSize(uint64_t size, std::function<void (std::exception_ptr)> callback) {
+        callback(offlineDatabase->setMaximumAmbientCacheSize(size));
+    }
+
+    void packDatabase(std::function<void(std::exception_ptr)> callback) { callback(offlineDatabase->pack()); }
+
+    void runPackDatabaseAutomatically(bool autopack) { offlineDatabase->runPackDatabaseAutomatically(autopack); }
 
 private:
     expected<OfflineDownload*, std::exception_ptr> getDownload(int64_t regionID) {
@@ -205,20 +234,21 @@ private:
     std::unordered_map<int64_t, std::unique_ptr<OfflineDownload>> downloads;
 };
 
-DefaultFileSource::DefaultFileSource(const std::string& cachePath,
-                                     const std::string& assetPath,
-                                     uint64_t maximumCacheSize)
-    : DefaultFileSource(cachePath, std::make_unique<AssetFileSource>(assetPath), maximumCacheSize) {
+DefaultFileSource::DefaultFileSource(const std::string& cachePath, const std::string& assetPath, bool supportCacheOnlyRequests_)
+    : DefaultFileSource(cachePath, std::make_unique<AssetFileSource>(assetPath), supportCacheOnlyRequests_) {
 }
 
-DefaultFileSource::DefaultFileSource(const std::string& cachePath,
-                                     std::unique_ptr<FileSource>&& assetFileSource_,
-                                     uint64_t maximumCacheSize)
+DefaultFileSource::DefaultFileSource(const std::string& cachePath, std::unique_ptr<FileSource>&& assetFileSource_, bool supportCacheOnlyRequests_)
         : assetFileSource(std::move(assetFileSource_))
-        , impl(std::make_unique<util::Thread<Impl>>("DefaultFileSource", assetFileSource, cachePath, maximumCacheSize)) {
+        , impl(std::make_unique<util::Thread<Impl>>("DefaultFileSource", assetFileSource, cachePath))
+        , supportCacheOnlyRequests(supportCacheOnlyRequests_) {
 }
 
 DefaultFileSource::~DefaultFileSource() = default;
+
+bool DefaultFileSource::supportsCacheOnlyRequests() const {
+    return supportCacheOnlyRequests;
+}
 
 void DefaultFileSource::setAPIBaseURL(const std::string& baseURL) {
     impl->actor().invoke(&Impl::setAPIBaseURL, baseURL);
@@ -252,8 +282,8 @@ void DefaultFileSource::setResourceTransform(optional<ActorRef<ResourceTransform
     impl->actor().invoke(&Impl::setResourceTransform, std::move(transform));
 }
 
-void DefaultFileSource::setResourceCachePath(const std::string& path) {
-    impl->actor().invoke(&Impl::setResourceCachePath, path);
+void DefaultFileSource::setResourceCachePath(const std::string& path, optional<ActorRef<PathChangeCallback>>&& callback) {
+    impl->actor().invoke(&Impl::setResourceCachePath, path, std::move(callback));
 }
 
 std::unique_ptr<AsyncRequest> DefaultFileSource::request(const Resource& resource, Callback callback) {
@@ -288,8 +318,13 @@ void DefaultFileSource::updateOfflineMetadata(const int64_t regionID,
     impl->actor().invoke(&Impl::updateMetadata, regionID, metadata, callback);
 }
 
-void DefaultFileSource::deleteOfflineRegion(OfflineRegion&& region, std::function<void (std::exception_ptr)> callback) {
+void DefaultFileSource::deleteOfflineRegion(OfflineRegion&& region, std::function<void(std::exception_ptr)> callback) {
     impl->actor().invoke(&Impl::deleteRegion, std::move(region), callback);
+}
+
+void DefaultFileSource::invalidateOfflineRegion(OfflineRegion& region,
+                                                std::function<void(std::exception_ptr)> callback) {
+    impl->actor().invoke(&Impl::invalidateRegion, region.getID(), callback);
 }
 
 void DefaultFileSource::setOfflineRegionObserver(OfflineRegion& region, std::unique_ptr<OfflineRegionObserver> observer) {
@@ -320,14 +355,38 @@ void DefaultFileSource::put(const Resource& resource, const Response& response) 
     impl->actor().invoke(&Impl::put, resource, response);
 }
 
-void DefaultFileSource::resetCache(std::function<void (std::exception_ptr)> callback) {
-    impl->actor().invoke(&Impl::resetCache, callback);
+void DefaultFileSource::resetDatabase(std::function<void (std::exception_ptr)> callback) {
+    impl->actor().invoke(&Impl::resetDatabase, std::move(callback));
+}
+
+void DefaultFileSource::packDatabase(std::function<void(std::exception_ptr)> callback) {
+    impl->actor().invoke(&Impl::packDatabase, std::move(callback));
+}
+
+void DefaultFileSource::runPackDatabaseAutomatically(bool autopack) {
+    impl->actor().invoke(&Impl::runPackDatabaseAutomatically, autopack);
+}
+
+void DefaultFileSource::invalidateAmbientCache(std::function<void (std::exception_ptr)> callback) {
+    impl->actor().invoke(&Impl::invalidateAmbientCache, std::move(callback));
+}
+
+void DefaultFileSource::clearAmbientCache(std::function<void(std::exception_ptr)> callback) {
+    impl->actor().invoke(&Impl::clearAmbientCache, std::move(callback));
+}
+
+void DefaultFileSource::setMaximumAmbientCacheSize(uint64_t size, std::function<void (std::exception_ptr)> callback) {
+    impl->actor().invoke(&Impl::setMaximumAmbientCacheSize, size, std::move(callback));
 }
 
 // For testing only:
 
 void DefaultFileSource::setOnlineStatus(const bool status) {
     impl->actor().invoke(&Impl::setOnlineStatus, status);
+}
+
+void DefaultFileSource::setMaximumConcurrentRequests(uint32_t maximumConcurrentRequests_) {
+    impl->actor().invoke(&Impl::setMaximumConcurrentRequests, maximumConcurrentRequests_);
 }
 
 } // namespace mbgl

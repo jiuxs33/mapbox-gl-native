@@ -18,9 +18,14 @@ namespace mbgl {
 
 using namespace style;
 
+namespace {
+
 inline const HillshadeLayer::Impl& impl(const Immutable<style::Layer::Impl>& impl) {
+    assert(impl->getTypeInfo() == HillshadeLayer::Impl::staticTypeInfo());
     return static_cast<const HillshadeLayer::Impl&>(*impl);
 }
+
+} // namespace
 
 RenderHillshadeLayer::RenderHillshadeLayer(Immutable<style::HillshadeLayer::Impl> _impl)
     : RenderLayer(makeMutable<HillshadeLayerProperties>(std::move(_impl))),
@@ -53,7 +58,7 @@ void RenderHillshadeLayer::evaluate(const PropertyEvaluationParameters& paramete
     passes = (properties->evaluated.get<style::HillshadeExaggeration >() > 0)
                  ? (RenderPass::Translucent | RenderPass::Pass3D)
                  : RenderPass::None;
-
+    properties->renderPasses = mbgl::underlying_type(passes);
     evaluatedProperties = std::move(properties);
 }
 
@@ -65,14 +70,16 @@ bool RenderHillshadeLayer::hasCrossfade() const {
     return false;
 }
 
-void RenderHillshadeLayer::render(PaintParameters& parameters, RenderSource* src) {
+void RenderHillshadeLayer::prepare(const LayerPrepareParameters& params) {
+    renderTiles = params.source->getRenderTiles();
+    maxzoom = params.source->getMaxZoom();
+}
+
+void RenderHillshadeLayer::render(PaintParameters& parameters) {
+    assert(renderTiles);
     if (parameters.pass != RenderPass::Translucent && parameters.pass != RenderPass::Pass3D)
         return;
-    const auto& evaluated = static_cast<const HillshadeLayerProperties&>(*evaluatedProperties).evaluated;
-    auto* demsrc = static_cast<RenderRasterDEMSource*>(src);
-    const uint8_t TERRAIN_RGB_MAXZOOM = 15;
-    const uint8_t maxzoom = demsrc != nullptr ? demsrc->getMaxZoom() : TERRAIN_RGB_MAXZOOM;
-
+    const auto& evaluated = static_cast<const HillshadeLayerProperties&>(*evaluatedProperties).evaluated;  
     auto draw = [&] (const mat4& matrix,
                      const auto& vertexBuffer,
                      const auto& indexBuffer,
@@ -117,7 +124,7 @@ void RenderHillshadeLayer::render(PaintParameters& parameters, RenderSource* src
             allUniformValues,
             allAttributeBindings,
             textureBindings,
-            getID()
+            getID() + "/" + util::toString(id)
         );
     };
 
@@ -125,12 +132,12 @@ void RenderHillshadeLayer::render(PaintParameters& parameters, RenderSource* src
     matrix::ortho(mat, 0, util::EXTENT, -util::EXTENT, 0, 0, 1);
     matrix::translate(mat, mat, 0, -util::EXTENT, 0);
 
-    for (const RenderTile& tile : renderTiles) {
-        auto bucket_ = tile.tile.getBucket<HillshadeBucket>(*baseImpl);
+    for (const RenderTile& tile : *renderTiles) {
+        auto* bucket_ = tile.getBucket(*baseImpl);
         if (!bucket_) {
             continue;
         }
-        HillshadeBucket& bucket = *bucket_;
+        auto& bucket = static_cast<HillshadeBucket&>(*bucket_);
 
         if (!bucket.hasData()){
             continue;
@@ -156,6 +163,7 @@ void RenderHillshadeLayer::render(PaintParameters& parameters, RenderSource* src
                     uniforms::dimension::Value( {{stride, stride}} ),
                     uniforms::zoom::Value( float(tile.id.canonical.z) ),
                     uniforms::maxzoom::Value( float(maxzoom) ),
+                    uniforms::unpack::Value( bucket.getDEMData().getUnpackVector() ),
                 },
                 paintAttributeData,
                 properties,
@@ -184,7 +192,7 @@ void RenderHillshadeLayer::render(PaintParameters& parameters, RenderSource* src
                 HillshadePrepareProgram::TextureBindings{
                     textures::image::Value{ bucket.dem->getResource() },
                 },
-                getID()
+                getID() + "/p/" + util::toString(tile.id)
             );
             bucket.texture = std::move(view->getTexture());
             bucket.setPrepared(true);

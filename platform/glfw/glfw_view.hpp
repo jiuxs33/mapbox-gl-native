@@ -1,9 +1,10 @@
 #pragma once
 
 #include <mbgl/map/map.hpp>
+#include <mbgl/util/geometry.hpp>
+#include <mbgl/util/optional.hpp>
 #include <mbgl/util/run_loop.hpp>
 #include <mbgl/util/timer.hpp>
-#include <mbgl/util/geometry.hpp>
 
 struct GLFWwindow;
 class GLFWBackend;
@@ -17,7 +18,7 @@ class RendererBackend;
 
 class GLFWView : public mbgl::MapObserver {
 public:
-    GLFWView(bool fullscreen = false, bool benchmark = false);
+    GLFWView(bool fullscreen, bool benchmark);
     ~GLFWView() override;
 
     float getPixelRatio() const;
@@ -27,6 +28,8 @@ public:
     void setRenderFrontend(GLFWRendererFrontend*);
 
     mbgl::gfx::RendererBackend& getRendererBackend();
+
+    void setTestDirectory(std::string dir) { testDirectory = std::move(dir); };
 
     // Callback called when the user presses the key mapped to style change.
     // The expected action is to set a new style, different to the current one.
@@ -41,7 +44,7 @@ public:
     }
 
     void setResetCacheCallback(std::function<void()> callback) {
-        resetCacheCallback = callback;
+        resetDatabaseCallback = callback;
     };
 
     void setShouldClose();
@@ -68,6 +71,7 @@ private:
     static void onFramebufferResize(GLFWwindow *window, int width, int height);
     static void onMouseClick(GLFWwindow *window, int button, int action, int modifiers);
     static void onMouseMove(GLFWwindow *window, double x, double y);
+    static void onWindowFocus(GLFWwindow *window, int focused);
 
     // Internal
     void report(float duration);
@@ -86,6 +90,7 @@ private:
     void updateAnimatedAnnotations();
     void toggleCustomSource();
 
+    void cycleDebugOptions();
     void clearAnnotations();
     void popAnnotation();
 
@@ -101,6 +106,8 @@ private:
     mbgl::Map* map = nullptr;
     GLFWRendererFrontend* rendererFrontend = nullptr;
     std::unique_ptr<GLFWBackend> backend;
+
+    std::string testDirectory = ".";
 
     bool fullscreen = false;
     const bool benchmark = false;
@@ -125,7 +132,7 @@ private:
     std::function<void()> changeStyleCallback;
     std::function<void()> pauseResumeCallback;
     std::function<void()> onlineStatusCallback;
-    std::function<void()> resetCacheCallback;
+    std::function<void()> resetDatabaseCallback;
     std::function<void(mbgl::Map*)> animateRouteCallback;
 
     mbgl::util::RunLoop runLoop;
@@ -133,4 +140,5 @@ private:
 
     GLFWwindow *window = nullptr;
     bool dirty = false;
+    mbgl::optional<std::string> featureID;
 };

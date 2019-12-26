@@ -1,3 +1,5 @@
+// clang-format off
+
 // This file is generated. Edit scripts/generate-style-code.js, then run `make style-code`.
 
 #pragma once
@@ -65,6 +67,8 @@ public:
         RasterPaintProperties::PossiblyEvaluated);
     ~RasterLayerProperties() override;
 
+    unsigned long constantsMask() const override;
+
     const RasterLayer::Impl& layerImpl() const;
     // Data members.
     RasterPaintProperties::PossiblyEvaluated evaluated;
@@ -72,3 +76,5 @@ public:
 
 } // namespace style
 } // namespace mbgl
+
+// clang-format on

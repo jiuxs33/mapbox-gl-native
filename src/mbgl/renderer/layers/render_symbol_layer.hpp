@@ -50,6 +50,12 @@ public:
     bool hasFill;
 };
 
+enum class SymbolType : uint8_t {
+    Text,
+    IconRGBA,
+    IconSDF
+};
+
 } // namespace style
 
 class RenderSymbolLayer final: public RenderLayer {
@@ -65,9 +71,8 @@ private:
     void evaluate(const PropertyEvaluationParameters&) override;
     bool hasTransition() const override;
     bool hasCrossfade() const override;
-    void upload(gfx::UploadPass&, UploadParameters&) override;
-    void render(PaintParameters&, RenderSource*) override;
-    void setRenderTiles(RenderTiles, const TransformState&) override;
+    void render(PaintParameters&) override;
+    void prepare(const LayerPrepareParameters&) override;
 
     // Paint properties
     style::SymbolPaintProperties::Unevaluated unevaluated;
@@ -76,7 +81,6 @@ private:
     float textSize = 16.0f;
 
     bool hasFormatSectionOverrides = false;
-    bool hasVariablePlacement = false;
 };
 
 } // namespace mbgl

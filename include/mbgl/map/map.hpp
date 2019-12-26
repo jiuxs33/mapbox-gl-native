@@ -60,7 +60,7 @@ public:
     bool isPanning() const;
 
     // Camera
-    CameraOptions getCameraOptions(const EdgeInsets& = {}) const;
+    CameraOptions getCameraOptions(optional<EdgeInsets> = {}) const;
     void jumpTo(const CameraOptions&);
     void easeTo(const CameraOptions&, const AnimationOptions&);
     void flyTo(const CameraOptions&, const AnimationOptions&);
@@ -97,6 +97,8 @@ public:
     // Projection
     ScreenCoordinate pixelForLatLng(const LatLng&) const;
     LatLng latLngForPixel(const ScreenCoordinate&) const;
+    std::vector<ScreenCoordinate> pixelsForLatLngs(const std::vector<LatLng>&) const;
+    std::vector<LatLng> latLngsForPixels(const std::vector<ScreenCoordinate>&) const;
 
     // Annotations
     void addAnnotationImage(std::unique_ptr<style::Image>);
@@ -118,7 +120,6 @@ public:
 
     // Debug
     void setDebug(MapDebugOptions);
-    void cycleDebugOptions();
     MapDebugOptions getDebug() const;
 
     bool isFullyLoaded() const;

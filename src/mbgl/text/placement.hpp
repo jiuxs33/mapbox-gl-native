@@ -12,6 +12,7 @@ namespace mbgl {
 
 class SymbolBucket;
 class SymbolInstance;
+enum class PlacedSymbolOrientation : bool;
 
 class OpacityState {
 public:
@@ -33,7 +34,7 @@ public:
 
 class VariableOffset {
 public:
-    float radialOffset;
+    std::array<float, 2> offset;
     float width;
     float height;
     style::TextVariableAnchorType anchor;
@@ -60,14 +61,10 @@ struct RetainedQueryData {
     uint32_t bucketInstanceId;
     std::shared_ptr<FeatureIndex> featureIndex;
     OverscaledTileID tileID;
-    std::shared_ptr<std::vector<size_t>> featureSortOrder;
-    
-    RetainedQueryData(uint32_t bucketInstanceId_,
-                      std::shared_ptr<FeatureIndex> featureIndex_,
-                      OverscaledTileID tileID_)
-        : bucketInstanceId(bucketInstanceId_)
-        , featureIndex(std::move(featureIndex_))
-        , tileID(std::move(tileID_)) {}
+    mutable FeatureSortOrder featureSortOrder;
+
+    RetainedQueryData(uint32_t bucketInstanceId_, std::shared_ptr<FeatureIndex> featureIndex_, OverscaledTileID tileID_)
+        : bucketInstanceId(bucketInstanceId_), featureIndex(std::move(featureIndex_)), tileID(tileID_) {}
 };
     
 class CollisionGroups {
@@ -90,63 +87,84 @@ private:
 
 class BucketPlacementParameters {
 public:
-    const mat4& posMatrix;
-    const mat4& textLabelPlaneMatrix;
-    const mat4& iconLabelPlaneMatrix;
-    float scale;
-    float pixelRatio;
+    const RenderTile& tile;
+    const mat4& projMatrix;
+    std::string sourceId;
+    std::shared_ptr<FeatureIndex> featureIndex;
     bool showCollisionBoxes;
-    bool holdingForFade;
-    const CollisionGroups::CollisionGroup& collisionGroup;
 };
-    
-class Placement {
+
+class Placement;
+
+class PlacementController {
 public:
-    Placement(const TransformState&, MapMode, style::TransitionOptions, const bool crossSourceCollisions, std::unique_ptr<Placement> prevPlacementOrNull = nullptr);
-    void placeLayer(const RenderLayer&, const mat4&, bool showCollisionBoxes);
-    void commit(TimePoint);
-    void updateLayerOpacities(const RenderLayer&);
-    float symbolFadeChange(TimePoint now) const;
+    PlacementController();
+    void setPlacement(Immutable<Placement>);
+    const Immutable<Placement>& getPlacement() const { return placement; }
+    void setPlacementStale() { stale = true; }
+    bool placementIsRecent(TimePoint now, const float zoom, optional<Duration> maximumDuration = nullopt) const;
     bool hasTransitions(TimePoint now) const;
 
+private:
+    Immutable<Placement> placement;
+    bool stale = false;
+};
+
+class Placement {
+public:
+    Placement(const TransformState&,
+              MapMode,
+              style::TransitionOptions,
+              const bool crossSourceCollisions,
+              optional<Immutable<Placement>> prevPlacement = nullopt);
+    void placeLayer(const RenderLayer&, const mat4&, bool showCollisionBoxes);
+    void commit(TimePoint, const double zoom);
+    void updateLayerBuckets(const RenderLayer&, const TransformState&, bool updateOpacities) const;
+    float symbolFadeChange(TimePoint now) const;
+    bool hasTransitions(TimePoint now) const;
+    bool transitionsEnabled() const;
+
     const CollisionIndex& getCollisionIndex() const;
+    TimePoint getCommitTime() const { return commitTime; }
+    Duration getUpdatePeriod(const float zoom) const;
 
-    bool stillRecent(TimePoint now) const;
-    void setRecent(TimePoint now);
-    void setStale();
-    
+    float zoomAdjustment(const float zoom) const;
+
     const RetainedQueryData& getQueryData(uint32_t bucketInstanceId) const;
-    using VariableOffsets = std::unordered_map<uint32_t, VariableOffset>;
-    const VariableOffsets& getVariableOffsets() const { return variableOffsets; }
-
 private:
     friend SymbolBucket;
-    void placeLayerBucket(
-            SymbolBucket&,
-            const BucketPlacementParameters&,
-            std::set<uint32_t>& seenCrossTileIDs);
-
-    void updateBucketOpacities(SymbolBucket&, std::set<uint32_t>&);
-    void markUsedJustification(SymbolBucket&, style::TextVariableAnchorType, SymbolInstance&);
+    void placeBucket(const SymbolBucket&, const BucketPlacementParameters&, std::set<uint32_t>& seenCrossTileIDs);
+    // Returns `true` if bucket vertices were updated; returns `false` otherwise.
+    bool updateBucketDynamicVertices(SymbolBucket&, const TransformState&, const RenderTile& tile) const;
+    void updateBucketOpacities(SymbolBucket&, const TransformState&, std::set<uint32_t>&) const;
+    void markUsedJustification(SymbolBucket&,
+                               style::TextVariableAnchorType,
+                               const SymbolInstance&,
+                               style::TextWritingModeType orientation) const;
+    void markUsedOrientation(SymbolBucket&, style::TextWritingModeType, const SymbolInstance&) const;
+    const Placement* getPrevPlacement() const { return prevPlacement ? prevPlacement->get() : nullptr; }
 
     CollisionIndex collisionIndex;
 
-    TransformState state;
     MapMode mapMode;
     style::TransitionOptions transitionOptions;
 
     TimePoint fadeStartTime;
     TimePoint commitTime;
+    float placementZoom;
+    float prevZoomAdjustment = 0;
 
     std::unordered_map<uint32_t, JointPlacement> placements;
     std::unordered_map<uint32_t, JointOpacityState> opacities;
     std::unordered_map<uint32_t, VariableOffset> variableOffsets;
+    std::unordered_map<uint32_t, style::TextWritingModeType> placedOrientations;
 
-    bool stale = false;
-    
     std::unordered_map<uint32_t, RetainedQueryData> retainedQueryData;
     CollisionGroups collisionGroups;
-    std::unique_ptr<Placement> prevPlacement;
+    mutable optional<Immutable<Placement>> prevPlacement;
+
+    // Used for debug purposes.
+    std::unordered_map<const CollisionFeature*, std::vector<ProjectedCollisionBox>> collisionCircles;
 };
 
 } // namespace mbgl

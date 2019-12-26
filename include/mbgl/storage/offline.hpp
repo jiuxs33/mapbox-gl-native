@@ -32,12 +32,12 @@ public:
     OfflineTilePyramidRegionDefinition(std::string, LatLngBounds, double, double, float, bool);
 
     /* Private */
-    const std::string styleURL;
-    const LatLngBounds bounds;
-    const double minZoom;
-    const double maxZoom;
-    const float pixelRatio;
-    const bool includeIdeographs;
+    std::string styleURL;
+    LatLngBounds bounds;
+    double minZoom;
+    double maxZoom;
+    float pixelRatio;
+    bool includeIdeographs;
 };
 
 /*
@@ -56,12 +56,12 @@ public:
     OfflineGeometryRegionDefinition(std::string styleURL, Geometry<double>, double minZoom, double maxZoom, float pixelRatio, bool includeIdeographs);
 
     /* Private */
-    const std::string styleURL;
-    const Geometry<double> geometry;
-    const double minZoom;
-    const double maxZoom;
-    const float pixelRatio;
-    const bool includeIdeographs;
+    std::string styleURL;
+    Geometry<double> geometry;
+    double minZoom;
+    double maxZoom;
+    float pixelRatio;
+    bool includeIdeographs;
 };
 
 /*
@@ -129,6 +129,11 @@ public:
     uint64_t completedTileCount = 0;
 
     /**
+     * The number of tiles that are known to be required for this region.
+     */
+    uint64_t requiredTileCount = 0;
+
+    /**
      * The cumulative size, in bytes, of all tiles that have been fully downloaded.
      * This is a subset of `completedResourceSize`.
      */
@@ -193,8 +198,7 @@ public:
      * tiles stored for offline regions has been reached.
      *
      * Once the limit has been reached, the SDK will not download further offline
-     * tiles from Mapbox APIs until existing tiles have been removed. Contact your
-     * Mapbox sales representative to raise the limit.
+     * tiles from Mapbox APIs until existing tiles have been removed.
      *
      * This limit does not apply to non-Mapbox tile sources.
      *
@@ -207,14 +211,8 @@ public:
 
 class OfflineRegion {
 public:
-    // Move-only; not publicly constructible.
-    OfflineRegion(OfflineRegion&&);
     ~OfflineRegion();
-
     OfflineRegion() = delete;
-    OfflineRegion(const OfflineRegion&) = delete;
-    OfflineRegion& operator=(OfflineRegion&&) = delete;
-    OfflineRegion& operator=(const OfflineRegion&) = delete;
 
     int64_t getID() const;
     const OfflineRegionDefinition& getDefinition() const;
@@ -227,9 +225,9 @@ private:
                   OfflineRegionDefinition,
                   OfflineRegionMetadata);
 
-    const int64_t id;
-    const OfflineRegionDefinition definition;
-    const OfflineRegionMetadata metadata;
+    int64_t id;
+    OfflineRegionDefinition definition;
+    OfflineRegionMetadata metadata;
 };
 
 using OfflineRegions = std::vector<OfflineRegion>;

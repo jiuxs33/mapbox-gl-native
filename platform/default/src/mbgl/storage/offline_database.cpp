@@ -13,15 +13,12 @@
 
 namespace mbgl {
 
-OfflineDatabase::OfflineDatabase(std::string path_, uint64_t maximumCacheSize_)
-    : path(std::move(path_)),
-      maximumCacheSize(maximumCacheSize_) {
+OfflineDatabase::OfflineDatabase(std::string path_)
+    : path(std::move(path_)) {
     try {
         initialize();
-    } catch (const util::IOException& ex) {
-        handleError(ex, "open database");
-    } catch (const mapbox::sqlite::Exception& ex) {
-        handleError(ex, "open database");
+    } catch (...) {
+        handleError("open database");
     }
     // Assume that we can't open the database right now and work with an empty database object.
 }
@@ -81,11 +78,22 @@ void OfflineDatabase::cleanup() {
     try {
         statements.clear();
         db.reset();
-    } catch (const util::IOException& ex) {
-        handleError(ex, "close database");
-    } catch (const mapbox::sqlite::Exception& ex) {
-        handleError(ex, "close database");
+    } catch (...) {
+        handleError("close database");
     }
+}
+
+bool OfflineDatabase::disabled() {
+    if (maximumAmbientCacheSize) {
+        return false;
+    }
+
+    auto regions = listRegions();
+    if (regions && !regions.value().empty()) {
+        return false;
+    }
+
+    return true;
 }
 
 void OfflineDatabase::handleError(const mapbox::sqlite::Exception& ex, const char* action) {
@@ -112,6 +120,28 @@ void OfflineDatabase::handleError(const util::IOException& ex, const char* actio
     Log::Error(Event::Database, ex.code, "Can't %s: %s", action, ex.what());
 }
 
+void OfflineDatabase::handleError(const std::runtime_error& ex, const char* action) {
+    Log::Error(Event::Database, "Can't %s: %s", action, ex.what());
+}
+
+void OfflineDatabase::handleError(const char* action) {
+    // Note: mbgl-defined exceptions must be handled first.
+    try {
+        throw;
+    } catch (const mapbox::sqlite::Exception& ex) {
+        handleError(ex, action);
+    } catch (const util::IOException& ex) {
+        handleError(ex, action);
+    } catch (const MapboxTileLimitExceededException& ex) {
+        throw; // This is ours and must be handled on client side.
+    } catch (const std::runtime_error& ex) {
+        handleError(ex, action);
+    } catch (...) {
+        assert(false);
+        Log::Error(Event::Database, "Can't %s", action);
+    }
+}
+
 void OfflineDatabase::removeExisting() {
     Log::Warning(Event::Database, "Removing existing incompatible offline database");
 
@@ -124,12 +154,12 @@ void OfflineDatabase::removeExisting() {
 void OfflineDatabase::removeOldCacheTable() {
     assert(db);
     db->exec("DROP TABLE IF EXISTS http_cache");
-    db->exec("VACUUM");
+    if (autopack) vacuum();
 }
 
 void OfflineDatabase::createSchema() {
     assert(db);
-    db->exec("PRAGMA auto_vacuum = INCREMENTAL");
+    vacuum();
     db->exec("PRAGMA journal_mode = DELETE");
     db->exec("PRAGMA synchronous = FULL");
     mapbox::sqlite::Transaction transaction(*db);
@@ -140,8 +170,7 @@ void OfflineDatabase::createSchema() {
 
 void OfflineDatabase::migrateToVersion3() {
     assert(db);
-    db->exec("PRAGMA auto_vacuum = INCREMENTAL");
-    db->exec("VACUUM");
+    vacuum();
     db->exec("PRAGMA user_version = 3");
 }
 
@@ -167,6 +196,16 @@ void OfflineDatabase::migrateToVersion6() {
     transaction.commit();
 }
 
+void OfflineDatabase::vacuum() {
+    assert(db);
+    if (getPragma<int64_t>("PRAGMA auto_vacuum") != 2 /*INCREMENTAL*/) {
+        db->exec("PRAGMA auto_vacuum = INCREMENTAL");
+        db->exec("VACUUM");
+    } else {
+        db->exec("PRAGMA incremental_vacuum");
+    }
+}
+
 mapbox::sqlite::Statement& OfflineDatabase::getStatement(const char* sql) {
     if (!db) {
         initialize();
@@ -179,13 +218,14 @@ mapbox::sqlite::Statement& OfflineDatabase::getStatement(const char* sql) {
 }
 
 optional<Response> OfflineDatabase::get(const Resource& resource) try {
+    if (disabled()) {
+        return nullopt;
+    }
+
     auto result = getInternal(resource);
     return result ? optional<Response>{ result->first } : nullopt;
-} catch (const util::IOException& ex) {
-    handleError(ex, "read resource");
-    return nullopt;
-} catch (const mapbox::sqlite::Exception& ex) {
-    handleError(ex, "read resource");
+} catch (...) {
+    handleError("read resource");
     return nullopt;
 }
 
@@ -211,13 +251,18 @@ std::pair<bool, uint64_t> OfflineDatabase::put(const Resource& resource, const R
     if (!db) {
         initialize();
     }
+
+    if (disabled()) {
+        return { false, 0 };
+    }
+
     mapbox::sqlite::Transaction transaction(*db, mapbox::sqlite::Transaction::Immediate);
     auto result = putInternal(resource, response, true);
     transaction.commit();
     return result;
-} catch (const mapbox::sqlite::Exception& ex) {
-    handleError(ex, "write resource");
-    return { false, 0 };
+} catch (...) {
+    handleError("write resource");
+    return {false, 0};
 }
 
 std::pair<bool, uint64_t> OfflineDatabase::putInternal(const Resource& resource, const Response& response, bool evict_) {
@@ -606,6 +651,104 @@ bool OfflineDatabase::putTile(const Resource::TileData& tile,
     return true;
 }
 
+std::exception_ptr OfflineDatabase::invalidateAmbientCache() try {
+    // clang-format off
+    mapbox::sqlite::Query tileQuery{ getStatement(
+        "UPDATE tiles "
+        "SET expires = 0, must_revalidate = 1 "
+        "WHERE id NOT IN ("
+        "    SELECT tile_id FROM region_tiles"
+        ")"
+    ) };
+    // clang-format on
+
+    tileQuery.run();
+
+    // clang-format off
+    mapbox::sqlite::Query resourceQuery{ getStatement(
+        "UPDATE resources "
+        "SET expires = 0, must_revalidate = 1 "
+        "WHERE id NOT IN ("
+        "    SELECT resource_id FROM region_resources"
+        ")"
+    ) };
+    // clang-format on
+
+    resourceQuery.run();
+
+    return nullptr;
+} catch (...) {
+    handleError("invalidate ambient cache");
+    return std::current_exception();
+}
+
+std::exception_ptr OfflineDatabase::clearAmbientCache() try {
+    // clang-format off
+    mapbox::sqlite::Query tileQuery{ getStatement(
+        "DELETE FROM tiles "
+        "WHERE id NOT IN ("
+        "    SELECT tile_id FROM region_tiles"
+        ")"
+    ) };
+    // clang-format on
+
+    tileQuery.run();
+
+    // clang-format off
+    mapbox::sqlite::Query resourceQuery{ getStatement(
+        "DELETE FROM resources "
+        "WHERE id NOT IN ("
+        "    SELECT resource_id FROM region_resources"
+        ")"
+    ) };
+    // clang-format on
+
+    resourceQuery.run();
+
+    if (autopack) vacuum();
+
+    return nullptr;
+} catch (...) {
+    handleError("clear ambient cache");
+    return std::current_exception();
+}
+
+std::exception_ptr OfflineDatabase::invalidateRegion(int64_t regionID) try {
+    {
+        // clang-format off
+        mapbox::sqlite::Query tileQuery{ getStatement(
+            "UPDATE tiles "
+            "SET expires = 0, must_revalidate = 1 "
+            "WHERE id IN ("
+            "    SELECT tile_id FROM region_tiles WHERE region_id = ?"
+            ")"
+        ) };
+        // clang-format on
+
+        tileQuery.bind(1, regionID);
+        tileQuery.run();
+
+        // clang-format off
+        mapbox::sqlite::Query resourceQuery{ getStatement(
+            "UPDATE resources "
+            "SET expires = 0, must_revalidate = 1 "
+            "WHERE id IN ("
+            "    SELECT resource_id FROM region_resources WHERE region_id = ?"
+            ")"
+        ) };
+        // clang-format on
+
+        resourceQuery.bind(1, regionID);
+        resourceQuery.run();
+    }
+
+    assert(db);
+    return nullptr;
+} catch (...) {
+    handleError("invalidate region");
+    return std::current_exception();
+}
+
 expected<OfflineRegions, std::exception_ptr> OfflineDatabase::listRegions() try {
     mapbox::sqlite::Query query{ getStatement("SELECT id, definition, description FROM regions") };
     OfflineRegions result;
@@ -625,8 +768,8 @@ expected<OfflineRegions, std::exception_ptr> OfflineDatabase::listRegions() try 
     }
     // Explicit move to avoid triggering the copy constructor.
     return { std::move(result) };
-} catch (const mapbox::sqlite::Exception& ex) {
-    handleError(ex, "list regions");
+} catch (...) {
+    handleError("list regions");
     return unexpected<std::exception_ptr>(std::current_exception());
 }
 
@@ -643,8 +786,8 @@ OfflineDatabase::createRegion(const OfflineRegionDefinition& definition,
     query.bindBlob(2, metadata);
     query.run();
     return OfflineRegion(query.lastInsertRowId(), definition, metadata);
-} catch (const mapbox::sqlite::Exception& ex) {
-    handleError(ex, "create region");
+} catch (...) {
+    handleError("create region");
     return unexpected<std::exception_ptr>(std::current_exception());
 }
 
@@ -736,8 +879,8 @@ OfflineDatabase::updateMetadata(const int64_t regionID, const OfflineRegionMetad
     query.run();
 
     return metadata;
-} catch (const mapbox::sqlite::Exception& ex) {
-    handleError(ex, "update region metadata");
+} catch (...) {
+    handleError("update region metadata");
     return unexpected<std::exception_ptr>(std::current_exception());
 }
 
@@ -750,39 +893,27 @@ std::exception_ptr OfflineDatabase::deleteRegion(OfflineRegion&& region) try {
 
     evict(0);
     assert(db);
-    db->exec("PRAGMA incremental_vacuum");
+    if (autopack) vacuum();
 
     // Ensure that the cached offlineTileCount value is recalculated.
-    offlineMapboxTileCount = {};
+    offlineMapboxTileCount = nullopt;
     return nullptr;
-} catch (const mapbox::sqlite::Exception& ex) {
-    handleError(ex, "delete region");
+} catch (...) {
+    handleError("delete region");
     return std::current_exception();
 }
 
-optional<std::pair<Response, uint64_t>> OfflineDatabase::getRegionResource(int64_t regionID, const Resource& resource) try {
-    auto response = getInternal(resource);
-
-    if (response) {
-        markUsed(regionID, resource);
-    }
-
-    return response;
-} catch (const mapbox::sqlite::Exception& ex) {
-    handleError(ex, "read region resource");
+optional<std::pair<Response, uint64_t>> OfflineDatabase::getRegionResource(const Resource& resource) try {
+    return getInternal(resource);
+} catch (...) {
+    handleError("read region resource");
     return nullopt;
 }
 
-optional<int64_t> OfflineDatabase::hasRegionResource(int64_t regionID, const Resource& resource) try {
-    auto response = hasInternal(resource);
-
-    if (response) {
-        markUsed(regionID, resource);
-    }
-
-    return response;
-} catch (const mapbox::sqlite::Exception& ex) {
-    handleError(ex, "query region resource");
+optional<int64_t> OfflineDatabase::hasRegionResource(const Resource& resource) try {
+    return hasInternal(resource);
+} catch (...) {
+    handleError("query region resource");
     return nullopt;
 }
 
@@ -796,8 +927,8 @@ uint64_t OfflineDatabase::putRegionResource(int64_t regionID,
     auto size = putRegionResourceInternal(regionID, resource, response);
     transaction.commit();
     return size;
-} catch (const mapbox::sqlite::Exception& ex) {
-    handleError(ex, "write region resource");
+} catch (...) {
+    handleError("write region resource");
     return 0;
 }
 
@@ -842,17 +973,17 @@ void OfflineDatabase::putRegionResources(int64_t regionID,
     status.completedResourceSize += completedResourceSize;
     status.completedTileCount += completedTileCount;
     status.completedTileSize += completedTileSize;
-} catch (const mapbox::sqlite::Exception& ex) {
-    handleError(ex, "write region resources");
+} catch (...) {
+    handleError("write region resources");
 }
 
 uint64_t OfflineDatabase::putRegionResourceInternal(int64_t regionID, const Resource& resource, const Response& response) {
-    if (exceedsOfflineMapboxTileCountLimit(resource)) {
-        throw MapboxTileLimitExceededException();
-    }
-
     uint64_t size = putInternal(resource, response, false).second;
     bool previouslyUnused = markUsed(regionID, resource);
+
+    if (previouslyUnused && exceedsOfflineMapboxTileCountLimit(resource)) {
+        throw MapboxTileLimitExceededException();
+    }
 
     if (offlineMapboxTileCount
         && resource.kind == Resource::Kind::Tile
@@ -887,15 +1018,14 @@ bool OfflineDatabase::markUsed(int64_t regionID, const Resource& resource) {
         insertQuery.bind(6, tile.z);
         insertQuery.run();
 
-        if (insertQuery.changes() == 0) {
-            return false;
-        }
+        bool notOnThisRegion = insertQuery.changes() != 0;
 
         // clang-format off
         mapbox::sqlite::Query selectQuery{ getStatement(
             "SELECT region_id "
             "FROM region_tiles, tiles "
             "WHERE region_id   != ?1 "
+            "  AND tile_id      = id "
             "  AND url_template = ?2 "
             "  AND pixel_ratio  = ?3 "
             "  AND x            = ?4 "
@@ -910,7 +1040,10 @@ bool OfflineDatabase::markUsed(int64_t regionID, const Resource& resource) {
         selectQuery.bind(4, tile.x);
         selectQuery.bind(5, tile.y);
         selectQuery.bind(6, tile.z);
-        return !selectQuery.run();
+
+        bool notOnOtherRegion = !selectQuery.run();
+
+        return notOnThisRegion && notOnOtherRegion;
     } else {
         // clang-format off
         mapbox::sqlite::Query insertQuery{ getStatement(
@@ -949,8 +1082,8 @@ expected<OfflineRegionDefinition, std::exception_ptr> OfflineDatabase::getRegion
     query.run();
 
     return decodeOfflineRegionDefinition(query.get<std::string>(0));
-} catch (const mapbox::sqlite::Exception& ex) {
-    handleError(ex, "load region");
+} catch (...) {
+    handleError("load region");
     return unexpected<std::exception_ptr>(std::current_exception());
 }
 
@@ -966,8 +1099,8 @@ expected<OfflineRegionStatus, std::exception_ptr> OfflineDatabase::getRegionComp
     result.completedResourceSize += result.completedTileSize;
 
     return result;
-} catch (const mapbox::sqlite::Exception& ex) {
-    handleError(ex, "get region status");
+} catch (...) {
+    handleError("get region status");
     return unexpected<std::exception_ptr>(std::current_exception());
 }
 
@@ -1009,11 +1142,11 @@ T OfflineDatabase::getPragma(const char* sql) {
 // less than the maximum cache size. Returns false if this condition cannot be
 // satisfied.
 //
-// SQLite database never shrinks in size unless we call VACCUM. We here
+// SQLite database never shrinks in size unless we call VACUUM. We here
 // are monitoring the soft limit (i.e. number of free pages in the file)
 // and as it approaches to the hard limit (i.e. the actual file size) we
 // delete an arbitrary number of old cache entries. The free pages approach saves
-// us from calling VACCUM or keeping a running total, which can be costly.
+// us from calling VACUUM or keeping a running total, which can be costly.
 bool OfflineDatabase::evict(uint64_t neededFreeSize) {
     uint64_t pageSize = getPragma<int64_t>("PRAGMA page_size");
     uint64_t pageCount = getPragma<int64_t>("PRAGMA page_count");
@@ -1024,7 +1157,7 @@ bool OfflineDatabase::evict(uint64_t neededFreeSize) {
 
     // The addition of pageSize is a fudge factor to account for non `data` column
     // size, and because pages can get fragmented on the database.
-    while (usedSize() + neededFreeSize + pageSize > maximumCacheSize) {
+    while (usedSize() + neededFreeSize + pageSize > maximumAmbientCacheSize) {
         // clang-format off
         mapbox::sqlite::Query accessedQuery{ getStatement(
             "SELECT max(accessed) "
@@ -1091,6 +1224,28 @@ bool OfflineDatabase::evict(uint64_t neededFreeSize) {
     return true;
 }
 
+std::exception_ptr OfflineDatabase::setMaximumAmbientCacheSize(uint64_t size) {
+    uint64_t previousMaximumAmbientCacheSize = maximumAmbientCacheSize;
+
+    try {
+        maximumAmbientCacheSize = size;
+
+        uint64_t databaseSize = getPragma<int64_t>("PRAGMA page_size")
+            * getPragma<int64_t>("PRAGMA page_count");
+
+        if (databaseSize > maximumAmbientCacheSize) {
+            evict(0);
+            if (autopack) vacuum();
+        }
+
+        return nullptr;
+    } catch (...) {
+        maximumAmbientCacheSize = previousMaximumAmbientCacheSize;
+        handleError("set maximum ambient cache size");
+        return std::current_exception();
+    }
+}
+
 void OfflineDatabase::setOfflineMapboxTileCountLimit(uint64_t limit) {
     offlineMapboxTileCountLimit = limit;
 }
@@ -1125,8 +1280,8 @@ uint64_t OfflineDatabase::getOfflineMapboxTileCount() try {
 
     offlineMapboxTileCount = query.get<int64_t>(0);
     return *offlineMapboxTileCount;
-} catch (const mapbox::sqlite::Exception& ex) {
-    handleError(ex, "get offline Mapbox tile count");
+} catch (...) {
+    handleError("get offline Mapbox tile count");
     return std::numeric_limits<uint64_t>::max();
 }
 
@@ -1136,11 +1291,34 @@ bool OfflineDatabase::exceedsOfflineMapboxTileCountLimit(const Resource& resourc
         && offlineMapboxTileCountLimitExceeded();
 }
 
-std::exception_ptr OfflineDatabase::resetCache() try {
+void OfflineDatabase::markUsedResources(int64_t regionID, const std::list<Resource>& resources) try {
+    if (!db) {
+        initialize();
+    }
+    mapbox::sqlite::Transaction transaction(*db);
+    for (const auto& resource : resources) {
+        markUsed(regionID, resource);
+    }
+    transaction.commit();
+} catch (...) {
+    handleError("mark resources as used");
+}
+
+std::exception_ptr OfflineDatabase::pack() try {
+    if (!db) initialize();
+    vacuum();
+    return nullptr;
+} catch (...) {
+    handleError("pack storage");
+    return std::current_exception();
+}
+
+std::exception_ptr OfflineDatabase::resetDatabase() try {
     removeExisting();
     initialize();
     return nullptr;
 } catch (...) {
+    handleError("reset database");
     return std::current_exception();
 }
 

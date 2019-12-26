@@ -1,5 +1,6 @@
 #include <mbgl/renderer/render_layer.hpp>
 #include <mbgl/renderer/paint_parameters.hpp>
+#include <mbgl/renderer/render_source.hpp>
 #include <mbgl/renderer/render_tile.hpp>
 #include <mbgl/style/types.hpp>
 #include <mbgl/style/layer.hpp>
@@ -31,7 +32,7 @@ const std::string& RenderLayer::getID() const {
 }
 
 bool RenderLayer::hasRenderPass(RenderPass pass) const {
-    return bool(passes & pass);
+    return passes & pass;
 }
 
 bool RenderLayer::needsRendering() const {
@@ -44,26 +45,15 @@ bool RenderLayer::supportsZoom(float zoom) const {
     return baseImpl->minZoom <= zoom && baseImpl->maxZoom >= zoom;
 }
 
-void RenderLayer::setRenderTiles(RenderTiles tiles, const TransformState&) {
-    renderTiles = filterRenderTiles(std::move(tiles));
+void RenderLayer::prepare(const LayerPrepareParameters& params) {
+    assert(params.source);
+    assert(params.source->isEnabled());
+    renderTiles = params.source->getRenderTiles();
+    addRenderPassesFromTiles();
 }
 
 optional<Color> RenderLayer::getSolidBackground() const {
     return nullopt;
-}
-
-RenderLayer::RenderTiles RenderLayer::filterRenderTiles(RenderTiles tiles) const {
-    RenderTiles filtered;
-
-    for (auto& tileRef : tiles) {
-        auto& tile = tileRef.get().tile;
-        assert(tile.isRenderable());
-        if (tile.holdForFade()) {
-            continue;
-        }
-        filtered.emplace_back(tileRef);
-    }
-    return filtered;
 }
 
 void RenderLayer::markContextDestroyed() {
@@ -95,6 +85,22 @@ void RenderLayer::checkRenderability(const PaintParameters& parameters,
                    activeBindingCount - parameters.context.minimumRequiredVertexBindingCount);
         hasRenderFailures = true;
     }
+}
+
+void RenderLayer::addRenderPassesFromTiles() {
+    assert(renderTiles);
+    for (const RenderTile& tile : *renderTiles) {
+        if (const LayerRenderData* renderData = tile.getLayerRenderData(*baseImpl)) {
+            passes |= RenderPass(renderData->layerProperties->renderPasses);
+        }
+    }
+}
+
+const LayerRenderData* RenderLayer::getRenderDataForPass(const RenderTile& tile, RenderPass pass) const {
+    if (const LayerRenderData* renderData = tile.getLayerRenderData(*baseImpl)) {
+        return bool(RenderPass(renderData->layerProperties->renderPasses) & pass) ? renderData : nullptr;
+    }
+    return nullptr;
 }
 
 } //namespace mbgl

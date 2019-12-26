@@ -1,5 +1,4 @@
 #include <mbgl/renderer/tile_pyramid.hpp>
-#include <mbgl/renderer/render_tile.hpp>
 #include <mbgl/renderer/paint_parameters.hpp>
 #include <mbgl/renderer/render_source.hpp>
 #include <mbgl/renderer/tile_parameters.hpp>
@@ -40,31 +39,14 @@ bool TilePyramid::isLoaded() const {
     return true;
 }
 
-void TilePyramid::upload(gfx::UploadPass& parameters) {
-    for (auto& tile : renderTiles) {
-        tile.upload(parameters);
-    }
+Tile* TilePyramid::getTile(const OverscaledTileID& tileID) {
+    auto it = tiles.find(tileID);
+    return it == tiles.end() ? cache.get(tileID) : it->second.get();
 }
 
-void TilePyramid::prepare(PaintParameters& parameters) {
-    for (auto& tile : renderTiles) {
-        tile.prepare(parameters);
-    }
-}
-
-void TilePyramid::finishRender(PaintParameters& parameters) {
-    for (auto& tile : renderTiles) {
-        tile.finishRender(parameters);
-    }
-}
-
-std::vector<std::reference_wrapper<RenderTile>> TilePyramid::getRenderTiles() {
-    return { renderTiles.begin(), renderTiles.end() };
-}
-
-Tile* TilePyramid::getTile(const OverscaledTileID& tileID){
-        auto it = tiles.find(tileID);
-        return it == tiles.end() ? cache.get(tileID) : it->second.get();
+const Tile* TilePyramid::getRenderedTile(const UnwrappedTileID& tileID) const {
+    auto it = renderedTiles.find(tileID);
+    return it != renderedTiles.end() ? &it->second.get() : nullptr;
 }
 
 void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& layers,
@@ -86,12 +68,16 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
     if (!needsRendering) {
         if (!needsRelayout) {
             for (auto& entry : tiles) {
+                // These tiles are invisible, we set optional necessity
+                // for them and thus suppress network requests on
+                // tiles expiration (see `OnlineFileRequest`).
+                entry.second->setNecessity(TileNecessity::Optional);
                 cache.add(entry.first, std::move(entry.second));
             }
         }
 
         tiles.clear();
-        renderTiles.clear();
+        renderedTiles.clear();
 
         return;
     }
@@ -176,10 +162,7 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
         return tiles.emplace(tileID, std::move(tile)).first->second.get();
     };
 
-    std::map<UnwrappedTileID, Tile*> previouslyRenderedTiles;
-    for (auto& renderTile : renderTiles) {
-        previouslyRenderedTiles[renderTile.id] = &renderTile.tile;
-    }
+    auto previouslyRenderedTiles = std::move(renderedTiles);
 
     auto renderTileFn = [&](const UnwrappedTileID& tileID, Tile& tile) {
         addRenderTile(tileID, tile);
@@ -187,7 +170,7 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
         tile.markRenderedIdeal();
     };
 
-    renderTiles.clear();
+    renderedTiles.clear();
 
     if (!panTiles.empty()) {
         algorithm::updateRenderables(getTileFn, createTileFn, retainTileFn,
@@ -198,7 +181,7 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
                                  idealTiles, zoomRange, tileZoom);
     
     for (auto previouslyRenderedTile : previouslyRenderedTiles) {
-        Tile& tile = *previouslyRenderedTile.second;
+        Tile& tile = previouslyRenderedTile.second;
         tile.markRenderedPreviously();
         if (tile.holdForFade()) {
             // Since it was rendered in the last frame, we know we have it
@@ -242,10 +225,11 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
         pair.second->setShowCollisionBoxes(parameters.debugOptions & MapDebugOptions::Collision);
     }
 
-    // Initialize render tiles fields and update the tile contained layer render data.
-    for (RenderTile& renderTile : renderTiles) {
-        Tile& tile = renderTile.tile;
+    // Initialize renderable tiles and update the contained layer render data.
+    for (auto& entry : renderedTiles) {
+        Tile& tile = entry.second;
         assert(tile.isRenderable());
+        tile.usedByRenderedLayers = false;
 
         const bool holdForFade = tile.holdForFade();
         for (const auto& layerProperties : layers) {
@@ -253,12 +237,7 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
             if (holdForFade && typeInfo->fadingTiles == LayerTypeInfo::FadingTiles::NotRequired) {
                 continue;
             }
-            // Update layer properties for complete tiles; for incomplete just check the presence.
-            bool layerRenderableInTile = tile.isComplete() ? tile.updateLayerProperties(layerProperties)
-                                                           : static_cast<bool>(tile.getBucket(*layerProperties->baseImpl));
-            if (layerRenderableInTile) {
-                renderTile.used = true;
-            }
+            tile.usedByRenderedLayers |= tile.layerPropertiesUpdated(layerProperties);
         }
     }
 }
@@ -287,6 +266,7 @@ void TilePyramid::handleWrapJump(float lng) {
 
     if (wrapDelta) {
         std::map<OverscaledTileID, std::unique_ptr<Tile>> newTiles;
+        std::map<UnwrappedTileID, std::reference_wrapper<Tile>> newRenderTiles;
         for (auto& tile : tiles) {
             auto newID = tile.second->id.unwrapTo(tile.second->id.wrap + wrapDelta);
             tile.second->id = newID;
@@ -294,24 +274,25 @@ void TilePyramid::handleWrapJump(float lng) {
         }
         tiles = std::move(newTiles);
 
-        for (auto& renderTile : renderTiles) {
-            renderTile.id = renderTile.id.unwrapTo(renderTile.id.wrap + wrapDelta);
+        for (auto& tile : renderedTiles) {
+            UnwrappedTileID newID = tile.first.unwrapTo(tile.first.wrap + wrapDelta);
+            newRenderTiles.emplace(newID, tile.second);
         }
+        renderedTiles = std::move(newRenderTiles);
     }
 }
 
-
-std::unordered_map<std::string, std::vector<Feature>> TilePyramid::queryRenderedFeatures(const ScreenLineString& geometry,
-                                           const TransformState& transformState,
-                                           const std::vector<const RenderLayer*>& layers,
-                                           const RenderedQueryOptions& options,
-                                           const mat4& projMatrix) const {
+std::unordered_map<std::string, std::vector<Feature>> TilePyramid::queryRenderedFeatures(
+    const ScreenLineString& geometry, const TransformState& transformState,
+    const std::unordered_map<std::string, const RenderLayer*>& layers, const RenderedQueryOptions& options,
+    const mat4& projMatrix, const SourceFeatureState& featureState) const {
     std::unordered_map<std::string, std::vector<Feature>> result;
-    if (renderTiles.empty() || geometry.empty()) {
+    if (renderedTiles.empty() || geometry.empty()) {
         return result;
     }
 
     LineString<double> queryGeometry;
+    queryGeometry.reserve(geometry.size());
 
     for (const auto& p : geometry) {
         queryGeometry.push_back(TileCoordinate::fromScreenCoordinate(
@@ -319,26 +300,29 @@ std::unordered_map<std::string, std::vector<Feature>> TilePyramid::queryRendered
     }
 
     mapbox::geometry::box<double> box = mapbox::geometry::envelope(queryGeometry);
-    // TODO: Find out why we need a special sorting algorithm here.
-    std::vector<std::reference_wrapper<const RenderTile>> sortedTiles{ renderTiles.begin(),
-                                                                       renderTiles.end() };
-    std::sort(sortedTiles.begin(), sortedTiles.end(), [](const RenderTile& a, const RenderTile& b) {
-        return std::tie(a.id.canonical.z, a.id.canonical.y, a.id.wrap, a.id.canonical.x) <
-            std::tie(b.id.canonical.z, b.id.canonical.y, b.id.wrap, b.id.canonical.x);
-    });
+
+    auto cmp = [](const UnwrappedTileID& a, const UnwrappedTileID& b) {
+        return std::tie(a.canonical.z, a.canonical.y, a.wrap, a.canonical.x) <
+            std::tie(b.canonical.z, b.canonical.y, b.wrap, b.canonical.x);
+    };
+
+    std::map<UnwrappedTileID, std::reference_wrapper<Tile>, decltype(cmp)> sortedTiles{renderedTiles.begin(), renderedTiles.end(), cmp};
 
     auto maxPitchScaleFactor = transformState.maxPitchScaleFactor();
 
-    for (const RenderTile& renderTile : sortedTiles) {
-        const float scale = std::pow(2, transformState.getZoom() - renderTile.id.canonical.z);
-        auto queryPadding = maxPitchScaleFactor * renderTile.tile.getQueryPadding(layers) * util::EXTENT / util::tileSize / scale;
+    for (const auto& entry : sortedTiles) {
+        const UnwrappedTileID& id = entry.first;
+        Tile& tile = entry.second;
 
-        GeometryCoordinate tileSpaceBoundsMin = TileCoordinate::toGeometryCoordinate(renderTile.id, box.min);
+        const float scale = transformState.getScale() / (1 << id.canonical.z); // equivalent to std::pow(2, transformState.getZoom() - id.canonical.z);
+        auto queryPadding = maxPitchScaleFactor * tile.getQueryPadding(layers) * util::EXTENT / util::tileSize / scale;
+
+        GeometryCoordinate tileSpaceBoundsMin = TileCoordinate::toGeometryCoordinate(id, box.min);
         if (tileSpaceBoundsMin.x - queryPadding >= util::EXTENT || tileSpaceBoundsMin.y - queryPadding >= util::EXTENT) {
             continue;
         }
 
-        GeometryCoordinate tileSpaceBoundsMax = TileCoordinate::toGeometryCoordinate(renderTile.id, box.max);
+        GeometryCoordinate tileSpaceBoundsMax = TileCoordinate::toGeometryCoordinate(id, box.max);
         if (tileSpaceBoundsMax.x + queryPadding < 0 || tileSpaceBoundsMax.y + queryPadding < 0) {
             continue;
         }
@@ -346,15 +330,11 @@ std::unordered_map<std::string, std::vector<Feature>> TilePyramid::queryRendered
         GeometryCoordinates tileSpaceQueryGeometry;
         tileSpaceQueryGeometry.reserve(queryGeometry.size());
         for (const auto& c : queryGeometry) {
-            tileSpaceQueryGeometry.push_back(TileCoordinate::toGeometryCoordinate(renderTile.id, c));
+            tileSpaceQueryGeometry.push_back(TileCoordinate::toGeometryCoordinate(id, c));
         }
 
-        renderTile.tile.queryRenderedFeatures(result,
-                                              tileSpaceQueryGeometry,
-                                              transformState,
-                                              layers,
-                                              options,
-                                              projMatrix);
+        tile.queryRenderedFeatures(result, tileSpaceQueryGeometry, transformState, layers, options, projMatrix,
+                                   featureState);
     }
 
     return result;
@@ -389,16 +369,26 @@ void TilePyramid::dumpDebugLogs() const {
 }
 
 void TilePyramid::clearAll() {
+    fadingTiles = false;
     tiles.clear();
-    renderTiles.clear();
+    renderedTiles.clear();
     cache.clear();
 }
 
 void TilePyramid::addRenderTile(const UnwrappedTileID& tileID, Tile& tile) {
     assert(tile.isRenderable());
-    auto it = std::lower_bound(renderTiles.begin(), renderTiles.end(), tileID,
-        [](const RenderTile& a, const UnwrappedTileID& id) { return a.id < id; });
-    renderTiles.emplace(it, tileID, tile);
+    renderedTiles.emplace(tileID, tile);
+}
+
+void TilePyramid::updateFadingTiles() {
+    fadingTiles = false;
+    for (auto& entry : renderedTiles) {
+        Tile& tile = entry.second;
+        if (tile.holdForFade()) {
+            fadingTiles = true;
+            tile.performedFadePlacement();
+        }
+    }
 }
 
 } // namespace mbgl

@@ -4,7 +4,7 @@
 #include <mbgl/map/map.hpp>
 #include <mbgl/map/map_options.hpp>
 #include <mbgl/gl/defines.hpp>
-#include <mbgl/gl/headless_frontend.hpp>
+#include <mbgl/gfx/headless_frontend.hpp>
 #include <mbgl/storage/resource_options.hpp>
 #include <mbgl/style/style.hpp>
 #include <mbgl/style/layers/custom_layer.hpp>
@@ -87,6 +87,10 @@ public:
 };
 
 TEST(CustomLayer, Basic) {
+    if (gfx::Backend::GetType() != gfx::Backend::Type::OpenGL) {
+        return;
+    }
+
     util::RunLoop loop;
 
     HeadlessFrontend frontend { 1 };
@@ -104,5 +108,5 @@ TEST(CustomLayer, Basic) {
     layer->setFillColor(Color{ 1.0, 1.0, 0.0, 1.0 });
     map.getStyle().addLayer(std::move(layer));
 
-    test::checkImage("test/fixtures/custom_layer/basic", frontend.render(map), 0.0006, 0.1);
+    test::checkImage("test/fixtures/custom_layer/basic", frontend.render(map).image, 0.0006, 0.1);
 }

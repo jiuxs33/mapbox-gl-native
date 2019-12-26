@@ -20,11 +20,11 @@ namespace mbgl {
 
 class PaintParameters;
 class TransformState;
-class RenderTile;
 class RenderLayer;
 class RenderedQueryOptions;
 class SourceQueryOptions;
 class TileParameters;
+class SourcePrepareParameters;
 
 class TilePyramid {
 public:
@@ -43,21 +43,16 @@ public:
                 optional<LatLngBounds> bounds,
                 std::function<std::unique_ptr<Tile> (const OverscaledTileID&)> createTile);
 
-    void upload(gfx::UploadPass&);
-    void prepare(PaintParameters&);
-    void finishRender(PaintParameters&);
-
-    std::vector<std::reference_wrapper<RenderTile>> getRenderTiles();
+    const std::map<UnwrappedTileID, std::reference_wrapper<Tile>>& getRenderedTiles() const { return renderedTiles; }
     Tile* getTile(const OverscaledTileID&);
+    const Tile* getRenderedTile(const UnwrappedTileID&) const;
 
     void handleWrapJump(float lng);
 
-    std::unordered_map<std::string, std::vector<Feature>>
-    queryRenderedFeatures(const ScreenLineString& geometry,
-                          const TransformState& transformState,
-                          const std::vector<const RenderLayer*>&,
-                          const RenderedQueryOptions& options,
-                          const mat4& projMatrix) const;
+    std::unordered_map<std::string, std::vector<Feature>> queryRenderedFeatures(
+        const ScreenLineString& geometry, const TransformState& transformState,
+        const std::unordered_map<std::string, const RenderLayer*>&, const RenderedQueryOptions& options,
+        const mat4& projMatrix, const mbgl::SourceFeatureState& featureState) const;
 
     std::vector<Feature> querySourceFeatures(const SourceQueryOptions&) const;
 
@@ -70,17 +65,21 @@ public:
     const std::map<OverscaledTileID, std::unique_ptr<Tile>>& getTiles() const { return tiles; }
     void clearAll();
 
+    void updateFadingTiles();
+    bool hasFadingTiles() const { return fadingTiles; }
+
 private:
     void addRenderTile(const UnwrappedTileID& tileID, Tile& tile);
 
     std::map<OverscaledTileID, std::unique_ptr<Tile>> tiles;
     TileCache cache;
 
-    std::list<RenderTile> renderTiles;
-
+    std::map<UnwrappedTileID, std::reference_wrapper<Tile>> renderedTiles; // Sorted by tile id.
     TileObserver* observer = nullptr;
 
     float prevLng = 0;
+
+    bool fadingTiles = false;
 };
 
 } // namespace mbgl

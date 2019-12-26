@@ -1,3 +1,5 @@
+// clang-format off
+
 // This file is generated. Edit scripts/generate-style-code.js, then run `make style-code`.
 
 #include <mbgl/style/layers/line_layer_properties.hpp>
@@ -16,10 +18,14 @@ LineLayerProperties::LineLayerProperties(
     CrossfadeParameters crossfade_,
     LinePaintProperties::PossiblyEvaluated evaluated_)
   : LayerProperties(std::move(impl_)),
-    crossfade(std::move(crossfade_)),
+    crossfade(crossfade_),
     evaluated(std::move(evaluated_)) {}
 
 LineLayerProperties::~LineLayerProperties() = default;
+
+unsigned long LineLayerProperties::constantsMask() const {
+    return evaluated.constantsMask();
+}
 
 const LineLayer::Impl& LineLayerProperties::layerImpl() const {
     return static_cast<const LineLayer::Impl&>(*baseImpl);
@@ -27,3 +33,5 @@ const LineLayer::Impl& LineLayerProperties::layerImpl() const {
 
 } // namespace style
 } // namespace mbgl
+
+// clang-format on

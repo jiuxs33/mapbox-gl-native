@@ -163,27 +163,26 @@ bool CrossTileSymbolLayerIndex::removeStaleBuckets(const std::unordered_set<uint
 
 CrossTileSymbolIndex::CrossTileSymbolIndex() = default;
 
-bool CrossTileSymbolIndex::addLayer(const RenderLayer& layer, float lng) {
+auto CrossTileSymbolIndex::addLayer(const RenderLayer& layer, float lng) -> AddLayerResult {
     auto& layerIndex = layerIndexes[layer.getID()];
 
-    bool symbolBucketsChanged = false;
+    AddLayerResult result = AddLayerResult::NoChanges;
     std::unordered_set<uint32_t> currentBucketIDs;
 
     layerIndex.handleWrapJump(lng);
 
     for (const auto& item : layer.getPlacementData()) {
-        RenderTile& renderTile = item.tile;
+        const RenderTile& renderTile = item.tile;
         Bucket& bucket = item.bucket;
-        auto result = bucket.registerAtCrossTileIndex(layerIndex, renderTile.tile.id, maxCrossTileID);
-        assert(result.first != 0u);
-        symbolBucketsChanged = symbolBucketsChanged || result.second;
-        currentBucketIDs.insert(result.first);
+        auto pair = bucket.registerAtCrossTileIndex(layerIndex, renderTile.getOverscaledTileID(), maxCrossTileID);
+        assert(pair.first != 0u);
+        if (pair.second) result |= AddLayerResult::BucketsAdded;
+        currentBucketIDs.insert(pair.first);
     }
 
-    if (layerIndex.removeStaleBuckets(currentBucketIDs)) {
-        symbolBucketsChanged = true;
-    }
-    return symbolBucketsChanged;
+    if (layerIndex.removeStaleBuckets(currentBucketIDs)) result |= AddLayerResult::BucketsRemoved;
+
+    return result;
 }
 
 void CrossTileSymbolIndex::pruneUnusedLayers(const std::set<std::string>& usedLayers) {

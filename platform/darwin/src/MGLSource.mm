@@ -3,9 +3,15 @@
 #import "MGLMapView_Private.h"
 #import "NSBundle+MGLAdditions.h"
 
+#if TARGET_OS_IPHONE || TARGET_OS_SIMULATOR
+#import "MMEEventsManager.h"
+#endif
+
 #include <mbgl/style/style.hpp>
 #include <mbgl/map/map.hpp>
 #include <mbgl/style/source.hpp>
+
+const MGLExceptionName MGLInvalidStyleSourceException = @"MGLInvalidStyleSourceException";
 
 @interface MGLSource ()
 
@@ -19,13 +25,14 @@
 
 @implementation MGLSource {
     std::unique_ptr<mbgl::style::Source> _pendingSource;
+    mapbox::base::WeakPtr<mbgl::style::Source> _weakSource;
 }
 
 
 - (instancetype)initWithIdentifier:(NSString *)identifier
 {
     if (self = [super init]) {
-        _identifier = identifier;
+        _identifier = [identifier copy];
     }
     return self;
 }
@@ -33,11 +40,16 @@
 - (instancetype)initWithRawSource:(mbgl::style::Source *)rawSource mapView:(MGLMapView *)mapView {
     NSString *identifier = @(rawSource->getID().c_str());
     if (self = [self initWithIdentifier:identifier]) {
-        _rawSource = rawSource;
-        _rawSource->peer = SourceWrapper { self };
+        _weakSource = rawSource->makeWeakPtr();
+        rawSource->peer = SourceWrapper { self };
         _mapView = mapView;
     }
     return self;
+}
+
+- (mbgl::style::Source *)rawSource
+{
+    return _weakSource.get();
 }
 
 - (instancetype)initWithPendingSource:(std::unique_ptr<mbgl::style::Source>)pendingSource {
@@ -59,6 +71,7 @@
 }
 
 - (BOOL)removeFromMapView:(MGLMapView *)mapView error:(NSError * __nullable * __nullable)outError {
+    MGLAssertStyleSourceIsValid();
     BOOL removed = NO;
     
     if (self.rawSource == mapView.style.rawStyle->getSource(self.identifier.UTF8String)) {
@@ -77,6 +90,10 @@
             *outError = [NSError errorWithDomain:MGLErrorDomain
                                             code:MGLErrorCodeSourceIsInUseCannotRemove
                                         userInfo:@{ NSLocalizedDescriptionKey : localizedDescription }];
+#if TARGET_OS_IPHONE || TARGET_OS_SIMULATOR
+            [[MMEEventsManager sharedManager] reportError:*outError];
+#endif
+            
         }
     } else if (outError) {
         // TODO: Consider raising an exception here
@@ -87,6 +104,9 @@
         *outError = [NSError errorWithDomain:MGLErrorDomain
                                         code:MGLErrorCodeSourceIdentifierMismatch
                                     userInfo:@{ NSLocalizedDescriptionKey : localizedDescription }];
+#if TARGET_OS_IPHONE || TARGET_OS_SIMULATOR
+        [[MMEEventsManager sharedManager] reportError:*outError];
+#endif
     }
     
     return removed;

@@ -25,7 +25,6 @@
 		1F7454AB1ED1DDBD00021D39 /* MGLLightTest.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1F7454AA1ED1DDBD00021D39 /* MGLLightTest.mm */; };
 		1F8A59FA21653483004DFE75 /* sideload_sat.db in Resources */ = {isa = PBXBuildFile; fileRef = 1F8A59F921653483004DFE75 /* sideload_sat.db */; };
 		1F8A5A04216D4696004DFE75 /* MGLLoggingConfiguration_Private.h in Headers */ = {isa = PBXBuildFile; fileRef = 1F8A5A01216D4695004DFE75 /* MGLLoggingConfiguration_Private.h */; };
-		1F8A5A05216D4696004DFE75 /* MGLLoggingConfiguration.m in Sources */ = {isa = PBXBuildFile; fileRef = 1F8A5A02216D4695004DFE75 /* MGLLoggingConfiguration.m */; };
 		1F8A5A06216D4696004DFE75 /* MGLLoggingConfiguration.h in Headers */ = {isa = PBXBuildFile; fileRef = 1F8A5A03216D4696004DFE75 /* MGLLoggingConfiguration.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		1F95931B1E6DE2B600D5B294 /* MGLNSDateAdditionsTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1F95931A1E6DE2B600D5B294 /* MGLNSDateAdditionsTests.mm */; };
 		1F9EF4061FBA1B0E0063FBB0 /* mapbox_helmet.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 1F9EF4051FBA1B0D0063FBB0 /* mapbox_helmet.pdf */; };
@@ -95,7 +94,11 @@
 		556660D61E1D07E400E2C41B /* MGLVersionNumber.m in Sources */ = {isa = PBXBuildFile; fileRef = 556660D51E1D07E400E2C41B /* MGLVersionNumber.m */; };
 		558DE7A61E56161C00C7916D /* MGLFoundation_Private.h in Headers */ = {isa = PBXBuildFile; fileRef = 558DE7A41E56161C00C7916D /* MGLFoundation_Private.h */; };
 		558DE7A71E56161C00C7916D /* MGLFoundation.mm in Sources */ = {isa = PBXBuildFile; fileRef = 558DE7A51E56161C00C7916D /* MGLFoundation.mm */; };
-		55CF7533213EDADF00ED86C4 /* libicu.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 55CF7532213EDADF00ED86C4 /* libicu.a */; };
+		5591AC6A2298361600FF9ADF /* MGLMapView+Impl.h in Headers */ = {isa = PBXBuildFile; fileRef = 5591AC682298361600FF9ADF /* MGLMapView+Impl.h */; };
+		5591AC6B2298361600FF9ADF /* MGLMapView+Impl.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5591AC692298361600FF9ADF /* MGLMapView+Impl.mm */; };
+		55CAF6322294407F00F17770 /* MGLMapView+OpenGL.h in Headers */ = {isa = PBXBuildFile; fileRef = 55CAF6312294407F00F17770 /* MGLMapView+OpenGL.h */; };
+		55CAF6342294409B00F17770 /* MGLMapView+OpenGL.mm in Sources */ = {isa = PBXBuildFile; fileRef = 55CAF6332294409B00F17770 /* MGLMapView+OpenGL.mm */; };
+		55CF7533213EDADF00ED86C4 /* libmbgl-vendor-icu.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 55CF7532213EDADF00ED86C4 /* libmbgl-vendor-icu.a */; };
 		55D120A31F7906E6004B6D81 /* libmbgl-filesource.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 55D120A41F7906E6004B6D81 /* libmbgl-filesource.a */; };
 		55D120A51F790A0C004B6D81 /* libmbgl-filesource.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 55D120A41F7906E6004B6D81 /* libmbgl-filesource.a */; };
 		55E2AD111E5B0A6900E8C587 /* MGLOfflineStorageTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = 55E2AD101E5B0A6900E8C587 /* MGLOfflineStorageTests.mm */; };
@@ -125,9 +128,15 @@
 		9654C12B1FFC38E000DB6A19 /* MGLPolyline_Private.h in Headers */ = {isa = PBXBuildFile; fileRef = 9654C12A1FFC38E000DB6A19 /* MGLPolyline_Private.h */; };
 		9654C12D1FFC394700DB6A19 /* MGLPolygon_Private.h in Headers */ = {isa = PBXBuildFile; fileRef = 9654C12C1FFC394700DB6A19 /* MGLPolygon_Private.h */; };
 		96E027311E57C9A7004B8E66 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 96E027331E57C9A7004B8E66 /* Localizable.strings */; };
+		CA0B3C072329F7E700E4B493 /* MGLTestAssertionHandler.m in Sources */ = {isa = PBXBuildFile; fileRef = CA0B3C052329F7E600E4B493 /* MGLTestAssertionHandler.m */; };
+		CA0B3C092329FB4800E4B493 /* MGLOfflinePackTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = CA0B3C082329FB4800E4B493 /* MGLOfflinePackTests.mm */; };
 		CA4045C7216720D700B356E1 /* MGLCluster.h in Headers */ = {isa = PBXBuildFile; fileRef = CA4045C4216720D700B356E1 /* MGLCluster.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		CA8FBC0D21A4A74300D1203C /* MGLRendererConfigurationTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = CA8FBC0C21A4A74300D1203C /* MGLRendererConfigurationTests.mm */; };
 		CA9461A620884CCB0015EB12 /* MGLAnnotationTests.m in Sources */ = {isa = PBXBuildFile; fileRef = CA9461A520884CCB0015EB12 /* MGLAnnotationTests.m */; };
+		CAD9D0AC22A88A32001B25EE /* MGLResourceTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = CAD9D0AB22A88A32001B25EE /* MGLResourceTests.mm */; };
+		CF762DEF22DC7EFF00338472 /* MGLLoggingConfiguration.mm in Sources */ = {isa = PBXBuildFile; fileRef = CF762DEE22DC7EFF00338472 /* MGLLoggingConfiguration.mm */; };
+		CFF9F98D23A2505700B0DE92 /* MGLNetworkIntegrationManager.m in Sources */ = {isa = PBXBuildFile; fileRef = CFF9F98B23A2505700B0DE92 /* MGLNetworkIntegrationManager.m */; };
+		CFF9F98E23A2505700B0DE92 /* MGLNetworkIntegrationManager.h in Headers */ = {isa = PBXBuildFile; fileRef = CFF9F98C23A2505700B0DE92 /* MGLNetworkIntegrationManager.h */; };
 		DA00FC8A1D5EEAC3009AABC8 /* MGLAttributionInfo.h in Headers */ = {isa = PBXBuildFile; fileRef = DA00FC881D5EEAC3009AABC8 /* MGLAttributionInfo.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		DA00FC8B1D5EEAC3009AABC8 /* MGLAttributionInfo.mm in Sources */ = {isa = PBXBuildFile; fileRef = DA00FC891D5EEAC3009AABC8 /* MGLAttributionInfo.mm */; };
 		DA0CD58E1CF56F5800A5F5A5 /* MGLFeatureTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = DA0CD58D1CF56F5800A5F5A5 /* MGLFeatureTests.mm */; };
@@ -151,7 +160,7 @@
 		DA5589771D320C41006B7F64 /* wms.json in Resources */ = {isa = PBXBuildFile; fileRef = DA5589761D320C41006B7F64 /* wms.json */; };
 		DA57D4B11EBC699800793288 /* MGLDocumentationGuideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA57D4B01EBC699800793288 /* MGLDocumentationGuideTests.swift */; };
 		DA6408D71DA4E5DA00908C90 /* MGLVectorStyleLayer.h in Headers */ = {isa = PBXBuildFile; fileRef = DA6408D51DA4E5DA00908C90 /* MGLVectorStyleLayer.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DA6408D81DA4E5DA00908C90 /* MGLVectorStyleLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = DA6408D61DA4E5DA00908C90 /* MGLVectorStyleLayer.m */; };
+		DA6408D81DA4E5DA00908C90 /* MGLVectorStyleLayer.mm in Sources */ = {isa = PBXBuildFile; fileRef = DA6408D61DA4E5DA00908C90 /* MGLVectorStyleLayer.mm */; };
 		DA695424215B1E6C002041A4 /* MGLMapCameraTests.m in Sources */ = {isa = PBXBuildFile; fileRef = DA695423215B1E6C002041A4 /* MGLMapCameraTests.m */; };
 		DA7262071DEEDD460043BB89 /* MGLOpenGLStyleLayer.h in Headers */ = {isa = PBXBuildFile; fileRef = DA7262051DEEDD460043BB89 /* MGLOpenGLStyleLayer.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		DA7262081DEEDD460043BB89 /* MGLOpenGLStyleLayer.mm in Sources */ = {isa = PBXBuildFile; fileRef = DA7262061DEEDD460043BB89 /* MGLOpenGLStyleLayer.mm */; };
@@ -275,7 +284,6 @@
 		DAE6C3BF1CC31F2E00DB3429 /* mapbox.pdf in Resources */ = {isa = PBXBuildFile; fileRef = DAE6C3BC1CC31F2E00DB3429 /* mapbox.pdf */; };
 		DAE6C3C21CC31F4500DB3429 /* Mapbox.h in Headers */ = {isa = PBXBuildFile; fileRef = DAE6C3C11CC31F4500DB3429 /* Mapbox.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		DAE6C3D21CC34C9900DB3429 /* MGLGeometryTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = DAE6C3C81CC34BD800DB3429 /* MGLGeometryTests.mm */; };
-		DAE6C3D31CC34C9900DB3429 /* MGLOfflinePackTests.m in Sources */ = {isa = PBXBuildFile; fileRef = DAE6C3C91CC34BD800DB3429 /* MGLOfflinePackTests.m */; };
 		DAE6C3D41CC34C9900DB3429 /* MGLOfflineRegionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = DAE6C3CA1CC34BD800DB3429 /* MGLOfflineRegionTests.m */; };
 		DAE6C3D61CC34C9900DB3429 /* MGLStyleTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = DAE6C3CC1CC34BD800DB3429 /* MGLStyleTests.mm */; };
 		DAE7DEC41E24549F007505A6 /* MGLNSStringAdditionsTests.m in Sources */ = {isa = PBXBuildFile; fileRef = DAE7DEC31E24549F007505A6 /* MGLNSStringAdditionsTests.m */; };
@@ -343,7 +351,6 @@
 		1F7454AA1ED1DDBD00021D39 /* MGLLightTest.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MGLLightTest.mm; sourceTree = "<group>"; };
 		1F8A59F921653483004DFE75 /* sideload_sat.db */ = {isa = PBXFileReference; lastKnownFileType = file; name = sideload_sat.db; path = ../../../test/fixtures/offline_database/sideload_sat.db; sourceTree = "<group>"; };
 		1F8A5A01216D4695004DFE75 /* MGLLoggingConfiguration_Private.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MGLLoggingConfiguration_Private.h; sourceTree = "<group>"; };
-		1F8A5A02216D4695004DFE75 /* MGLLoggingConfiguration.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MGLLoggingConfiguration.m; sourceTree = "<group>"; };
 		1F8A5A03216D4696004DFE75 /* MGLLoggingConfiguration.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MGLLoggingConfiguration.h; sourceTree = "<group>"; };
 		1F95931A1E6DE2B600D5B294 /* MGLNSDateAdditionsTests.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = MGLNSDateAdditionsTests.mm; path = ../../darwin/test/MGLNSDateAdditionsTests.mm; sourceTree = "<group>"; };
 		1F9EF4051FBA1B0D0063FBB0 /* mapbox_helmet.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = mapbox_helmet.pdf; sourceTree = "<group>"; };
@@ -416,7 +423,11 @@
 		556660D51E1D07E400E2C41B /* MGLVersionNumber.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = MGLVersionNumber.m; path = ../../darwin/test/MGLVersionNumber.m; sourceTree = "<group>"; };
 		558DE7A41E56161C00C7916D /* MGLFoundation_Private.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MGLFoundation_Private.h; sourceTree = "<group>"; };
 		558DE7A51E56161C00C7916D /* MGLFoundation.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MGLFoundation.mm; sourceTree = "<group>"; };
-		55CF7532213EDADF00ED86C4 /* libicu.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libicu.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		5591AC682298361600FF9ADF /* MGLMapView+Impl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "MGLMapView+Impl.h"; sourceTree = "<group>"; };
+		5591AC692298361600FF9ADF /* MGLMapView+Impl.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = "MGLMapView+Impl.mm"; sourceTree = "<group>"; };
+		55CAF6312294407F00F17770 /* MGLMapView+OpenGL.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "MGLMapView+OpenGL.h"; sourceTree = "<group>"; };
+		55CAF6332294409B00F17770 /* MGLMapView+OpenGL.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = "MGLMapView+OpenGL.mm"; sourceTree = "<group>"; };
+		55CF7532213EDADF00ED86C4 /* libmbgl-vendor-icu.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libmbgl-vendor-icu.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		55D120A41F7906E6004B6D81 /* libmbgl-filesource.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libmbgl-filesource.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		55D9B4B01D005D3900C1CCE2 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 		55E2AD101E5B0A6900E8C587 /* MGLOfflineStorageTests.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = MGLOfflineStorageTests.mm; path = ../../darwin/test/MGLOfflineStorageTests.mm; sourceTree = "<group>"; };
@@ -459,9 +470,16 @@
 		96E027391E57C9B9004B8E66 /* sv */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = sv; path = sv.lproj/Localizable.strings; sourceTree = "<group>"; };
 		96E0273A1E57C9BB004B8E66 /* vi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = vi; path = vi.lproj/Localizable.strings; sourceTree = "<group>"; };
 		96E0273B1E57C9BC004B8E66 /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		CA0B3C042329F7E600E4B493 /* MGLTestAssertionHandler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MGLTestAssertionHandler.h; path = ../../darwin/test/MGLTestAssertionHandler.h; sourceTree = "<group>"; };
+		CA0B3C052329F7E600E4B493 /* MGLTestAssertionHandler.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = MGLTestAssertionHandler.m; path = ../../darwin/test/MGLTestAssertionHandler.m; sourceTree = "<group>"; };
+		CA0B3C082329FB4800E4B493 /* MGLOfflinePackTests.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = MGLOfflinePackTests.mm; path = ../../darwin/test/MGLOfflinePackTests.mm; sourceTree = "<group>"; };
 		CA4045C4216720D700B356E1 /* MGLCluster.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MGLCluster.h; sourceTree = "<group>"; };
 		CA8FBC0C21A4A74300D1203C /* MGLRendererConfigurationTests.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = MGLRendererConfigurationTests.mm; path = ../../darwin/test/MGLRendererConfigurationTests.mm; sourceTree = "<group>"; };
 		CA9461A520884CCB0015EB12 /* MGLAnnotationTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = MGLAnnotationTests.m; path = test/MGLAnnotationTests.m; sourceTree = SOURCE_ROOT; };
+		CAD9D0AB22A88A32001B25EE /* MGLResourceTests.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = MGLResourceTests.mm; path = ../../darwin/test/MGLResourceTests.mm; sourceTree = "<group>"; };
+		CF762DEE22DC7EFF00338472 /* MGLLoggingConfiguration.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MGLLoggingConfiguration.mm; sourceTree = "<group>"; };
+		CFF9F98B23A2505700B0DE92 /* MGLNetworkIntegrationManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = MGLNetworkIntegrationManager.m; path = ../../darwin/src/MGLNetworkIntegrationManager.m; sourceTree = "<group>"; };
+		CFF9F98C23A2505700B0DE92 /* MGLNetworkIntegrationManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MGLNetworkIntegrationManager.h; path = ../../darwin/src/MGLNetworkIntegrationManager.h; sourceTree = "<group>"; };
 		DA00FC881D5EEAC3009AABC8 /* MGLAttributionInfo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MGLAttributionInfo.h; sourceTree = "<group>"; };
 		DA00FC891D5EEAC3009AABC8 /* MGLAttributionInfo.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MGLAttributionInfo.mm; sourceTree = "<group>"; };
 		DA0CD58D1CF56F5800A5F5A5 /* MGLFeatureTests.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = MGLFeatureTests.mm; path = ../../darwin/test/MGLFeatureTests.mm; sourceTree = "<group>"; };
@@ -506,7 +524,7 @@
 		DA618B271E68926E00CB7F44 /* fi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fi; path = fi.lproj/Localizable.strings; sourceTree = "<group>"; };
 		DA618B2A1E6892B500CB7F44 /* fi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fi; path = fi.lproj/Localizable.strings; sourceTree = "<group>"; };
 		DA6408D51DA4E5DA00908C90 /* MGLVectorStyleLayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MGLVectorStyleLayer.h; sourceTree = "<group>"; };
-		DA6408D61DA4E5DA00908C90 /* MGLVectorStyleLayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MGLVectorStyleLayer.m; sourceTree = "<group>"; };
+		DA6408D61DA4E5DA00908C90 /* MGLVectorStyleLayer.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MGLVectorStyleLayer.mm; sourceTree = "<group>"; };
 		DA695423215B1E6C002041A4 /* MGLMapCameraTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = MGLMapCameraTests.m; path = ../../darwin/test/MGLMapCameraTests.m; sourceTree = "<group>"; };
 		DA704CBA1F6372E8004B3F28 /* ru */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Foundation.strings; sourceTree = "<group>"; };
 		DA704CBE1F637531004B3F28 /* hu */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = hu; path = hu.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -683,7 +701,6 @@
 		DAE6C3C11CC31F4500DB3429 /* Mapbox.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Mapbox.h; path = src/Mapbox.h; sourceTree = SOURCE_ROOT; };
 		DAE6C3C61CC3499100DB3429 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		DAE6C3C81CC34BD800DB3429 /* MGLGeometryTests.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = MGLGeometryTests.mm; path = ../../darwin/test/MGLGeometryTests.mm; sourceTree = "<group>"; };
-		DAE6C3C91CC34BD800DB3429 /* MGLOfflinePackTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = MGLOfflinePackTests.m; path = ../../darwin/test/MGLOfflinePackTests.m; sourceTree = "<group>"; };
 		DAE6C3CA1CC34BD800DB3429 /* MGLOfflineRegionTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = MGLOfflineRegionTests.m; path = ../../darwin/test/MGLOfflineRegionTests.m; sourceTree = "<group>"; };
 		DAE6C3CC1CC34BD800DB3429 /* MGLStyleTests.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = MGLStyleTests.mm; path = ../../darwin/test/MGLStyleTests.mm; sourceTree = "<group>"; };
 		DAE7DEC31E24549F007505A6 /* MGLNSStringAdditionsTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = MGLNSStringAdditionsTests.m; path = ../../darwin/test/MGLNSStringAdditionsTests.m; sourceTree = "<group>"; };
@@ -730,7 +747,7 @@
 				5548BE781D09E718005DDE81 /* libmbgl-core.a in Frameworks */,
 				55D120A31F7906E6004B6D81 /* libmbgl-filesource.a in Frameworks */,
 				52B5D17F1E5E26DF00BBCB48 /* libmbgl-loop-darwin.a in Frameworks */,
-				55CF7533213EDADF00ED86C4 /* libicu.a in Frameworks */,
+				55CF7533213EDADF00ED86C4 /* libmbgl-vendor-icu.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -789,7 +806,7 @@
 				DA8F25911D51CA750010E6B5 /* MGLSymbolStyleLayer.h */,
 				DA8F25921D51CA750010E6B5 /* MGLSymbolStyleLayer.mm */,
 				DA6408D51DA4E5DA00908C90 /* MGLVectorStyleLayer.h */,
-				DA6408D61DA4E5DA00908C90 /* MGLVectorStyleLayer.m */,
+				DA6408D61DA4E5DA00908C90 /* MGLVectorStyleLayer.mm */,
 			);
 			name = Layers;
 			sourceTree = "<group>";
@@ -860,9 +877,20 @@
 		4031AD001E9FD61000A3EA26 /* Test Helpers */ = {
 			isa = PBXGroup;
 			children = (
+				CA0B3C042329F7E600E4B493 /* MGLTestAssertionHandler.h */,
+				CA0B3C052329F7E600E4B493 /* MGLTestAssertionHandler.m */,
 				4031AD011E9FD6A300A3EA26 /* MGLSDKTestHelpers.swift */,
 			);
 			name = "Test Helpers";
+			sourceTree = "<group>";
+		};
+		CFF9F98A23A2503300B0DE92 /* Interface */ = {
+			isa = PBXGroup;
+			children = (
+				CFF9F98C23A2505700B0DE92 /* MGLNetworkIntegrationManager.h */,
+				CFF9F98B23A2505700B0DE92 /* MGLNetworkIntegrationManager.m */,
+			);
+			name = Interface;
 			sourceTree = "<group>";
 		};
 		DA33895E1FA3E997001EA329 /* Recovered References */ = {
@@ -1136,7 +1164,7 @@
 		DAE6C31E1CC308BC00DB3429 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				55CF7532213EDADF00ED86C4 /* libicu.a */,
+				55CF7532213EDADF00ED86C4 /* libmbgl-vendor-icu.a */,
 				55D120A41F7906E6004B6D81 /* libmbgl-filesource.a */,
 				5548BE7B1D0ACBBD005DDE81 /* libmbgl-loop-darwin.a */,
 				55D9B4B01D005D3900C1CCE2 /* libz.tbd */,
@@ -1166,37 +1194,38 @@
 		DAE6C3371CC30DB200DB3429 /* SDK Tests */ = {
 			isa = PBXGroup;
 			children = (
-				4031AD001E9FD61000A3EA26 /* Test Helpers */,
-				4031ACFA1E9EB39A00A3EA26 /* Swift Integration */,
-				DA8F257D1D51C5F40010E6B5 /* Styling */,
+				DAE6C33A1CC30DB200DB3429 /* Info.plist */,
+				DA2784FD1DF03060001D5B8D /* Media.xcassets */,
 				CA9461A520884CCB0015EB12 /* MGLAnnotationTests.m */,
-				DAEDC4311D6033F1000224FF /* MGLAttributionInfoTests.m */,
 				DAEDC4361D606291000224FF /* MGLAttributionButtonTests.m */,
+				DAEDC4311D6033F1000224FF /* MGLAttributionInfoTests.m */,
 				DA35A2C11CCA9F4A00E826B2 /* MGLClockDirectionFormatterTests.m */,
 				3526EABC1DF9B19800006B43 /* MGLCodingTests.mm */,
 				DA35A2B51CCA14D700E826B2 /* MGLCompassDirectionFormatterTests.m */,
 				DA35A2A71CC9F41600E826B2 /* MGLCoordinateFormatterTests.m */,
+				35C6DF861E214C1800ACA483 /* MGLDistanceFormatterTests.m */,
 				DA2987591E1A4290002299F5 /* MGLDocumentationExampleTests.swift */,
 				DA57D4B01EBC699800793288 /* MGLDocumentationGuideTests.swift */,
 				DD58A4C71D822C6200E1F038 /* MGLExpressionTests.mm */,
-				35C6DF861E214C1800ACA483 /* MGLDistanceFormatterTests.m */,
-				1F95931A1E6DE2B600D5B294 /* MGLNSDateAdditionsTests.mm */,
 				DA0CD58D1CF56F5800A5F5A5 /* MGLFeatureTests.mm */,
 				DAE6C3C81CC34BD800DB3429 /* MGLGeometryTests.mm */,
 				DA695423215B1E6C002041A4 /* MGLMapCameraTests.m */,
 				076171C4213A0DC200668A35 /* MGLMapViewTests.m */,
+				1F95931A1E6DE2B600D5B294 /* MGLNSDateAdditionsTests.mm */,
 				DAE7DEC31E24549F007505A6 /* MGLNSStringAdditionsTests.m */,
-				DAE6C3C91CC34BD800DB3429 /* MGLOfflinePackTests.m */,
+				CA0B3C082329FB4800E4B493 /* MGLOfflinePackTests.mm */,
 				DAE6C3CA1CC34BD800DB3429 /* MGLOfflineRegionTests.m */,
 				55E2AD101E5B0A6900E8C587 /* MGLOfflineStorageTests.mm */,
 				35C5D84B1D6DD75B00E95907 /* MGLPredicateTests.mm */,
 				CA8FBC0C21A4A74300D1203C /* MGLRendererConfigurationTests.mm */,
+				CAD9D0AB22A88A32001B25EE /* MGLResourceTests.mm */,
 				DAE6C3CC1CC34BD800DB3429 /* MGLStyleTests.mm */,
 				556660D51E1D07E400E2C41B /* MGLVersionNumber.m */,
-				DAE6C33A1CC30DB200DB3429 /* Info.plist */,
-				DA2784FD1DF03060001D5B8D /* Media.xcassets */,
 				DA35D0891E1A631B007DED41 /* one-liner.json */,
 				1F8A59F921653483004DFE75 /* sideload_sat.db */,
+				DA8F257D1D51C5F40010E6B5 /* Styling */,
+				4031ACFA1E9EB39A00A3EA26 /* Swift Integration */,
+				4031AD001E9FD61000A3EA26 /* Test Helpers */,
 			);
 			name = "SDK Tests";
 			path = test;
@@ -1242,7 +1271,7 @@
 				DA87A99F1DC9DC6200810D09 /* MGLValueEvaluator.h */,
 				1F8A5A03216D4696004DFE75 /* MGLLoggingConfiguration.h */,
 				1F8A5A01216D4695004DFE75 /* MGLLoggingConfiguration_Private.h */,
-				1F8A5A02216D4695004DFE75 /* MGLLoggingConfiguration.m */,
+				CF762DEE22DC7EFF00338472 /* MGLLoggingConfiguration.mm */,
 			);
 			name = Foundation;
 			path = ../darwin/src;
@@ -1251,6 +1280,7 @@
 		DAE6C39E1CC31E7C00DB3429 /* Kit */ = {
 			isa = PBXGroup;
 			children = (
+				CFF9F98A23A2503300B0DE92 /* Interface */,
 				DA90B12C1DB43B180073CF55 /* Categories */,
 				DAE6C39F1CC31E9400DB3429 /* MGLAnnotationImage.h */,
 				DAC2ABC41CC6D343006D18C4 /* MGLAnnotationImage_Private.h */,
@@ -1262,6 +1292,10 @@
 				DAE6C3A01CC31E9400DB3429 /* MGLMapView.h */,
 				DAE6C3AC1CC31EF300DB3429 /* MGLMapView_Private.h */,
 				DAE6C3AD1CC31EF300DB3429 /* MGLMapView.mm */,
+				5591AC682298361600FF9ADF /* MGLMapView+Impl.h */,
+				5591AC692298361600FF9ADF /* MGLMapView+Impl.mm */,
+				55CAF6332294409B00F17770 /* MGLMapView+OpenGL.mm */,
+				55CAF6312294407F00F17770 /* MGLMapView+OpenGL.h */,
 				DAE6C3A11CC31E9400DB3429 /* MGLMapView+IBAdditions.h */,
 				DAE6C3AE1CC31EF300DB3429 /* MGLMapView+IBAdditions.mm */,
 				DAE6C3A21CC31E9400DB3429 /* MGLMapViewDelegate.h */,
@@ -1336,6 +1370,7 @@
 				DA7DC9811DED5F5C0027472F /* MGLVectorTileSource_Private.h in Headers */,
 				DAE6C3861CC31E2A00DB3429 /* MGLGeometry_Private.h in Headers */,
 				DAE6C3841CC31E2A00DB3429 /* MGLAccountManager_Private.h in Headers */,
+				CFF9F98E23A2505700B0DE92 /* MGLNetworkIntegrationManager.h in Headers */,
 				DACA8622201920BE00E9693A /* MGLRasterDEMSource.h in Headers */,
 				DAE6C3691CC31E0400DB3429 /* MGLTypes.h in Headers */,
 				07D9474D1F67441B00E37934 /* MGLComputedShapeSource_Private.h in Headers */,
@@ -1357,6 +1392,7 @@
 				35C5D8491D6DD66D00E95907 /* NSCompoundPredicate+MGLAdditions.h in Headers */,
 				9250B8C32073C69100EF338C /* MGLShapeOfflineRegion.h in Headers */,
 				747ABE67219B2C3200523B67 /* MGLSymbolStyleLayer_Private.h in Headers */,
+				55CAF6322294407F00F17770 /* MGLMapView+OpenGL.h in Headers */,
 				DD0902B31DB1AC6400C5BDCE /* MGLNetworkConfiguration.h in Headers */,
 				DAE6C3621CC31E0400DB3429 /* MGLOverlay.h in Headers */,
 				DAE6C3651CC31E0400DB3429 /* MGLPolyline.h in Headers */,
@@ -1367,6 +1403,7 @@
 				DA8F25B21D51CB270010E6B5 /* NSValue+MGLStyleAttributeAdditions.h in Headers */,
 				55335DF9212EC542000CE5F8 /* NSImage+MGLAdditions.h in Headers */,
 				1F7454A31ECFB00300021D39 /* MGLLight_Private.h in Headers */,
+				5591AC6A2298361600FF9ADF /* MGLMapView+Impl.h in Headers */,
 				359819591E02F611008FC139 /* NSCoder+MGLAdditions.h in Headers */,
 				DAE6C38E1CC31E2A00DB3429 /* MGLOfflineStorage_Private.h in Headers */,
 				747ABE61219B2C0000523B67 /* MGLLineStyleLayer_Private.h in Headers */,
@@ -1638,9 +1675,11 @@
 				1FCCEC53222EF9FE00302E3B /* MGLSDKMetricsManager.m in Sources */,
 				DAE6C3981CC31E2A00DB3429 /* NSBundle+MGLAdditions.m in Sources */,
 				DAE6C3B71CC31EF300DB3429 /* MGLMapView.mm in Sources */,
+				55CAF6342294409B00F17770 /* MGLMapView+OpenGL.mm in Sources */,
 				40B77E461DB11BCD003DA2FE /* NSArray+MGLAdditions.mm in Sources */,
 				DAE6C38C1CC31E2A00DB3429 /* MGLOfflinePack.mm in Sources */,
 				35D65C5B1D65AD5500722C23 /* NSDate+MGLAdditions.mm in Sources */,
+				CF762DEF22DC7EFF00338472 /* MGLLoggingConfiguration.mm in Sources */,
 				DD0902B21DB1AC6400C5BDCE /* MGLNetworkConfiguration.m in Sources */,
 				1F7454A51ECFB00300021D39 /* MGLLight.mm in Sources */,
 				DAE6C3B11CC31EF300DB3429 /* MGLAnnotationImage.m in Sources */,
@@ -1664,6 +1703,7 @@
 				408AA86A1DAEEE5D00022900 /* NSDictionary+MGLAdditions.mm in Sources */,
 				DA8F25881D51C9E10010E6B5 /* MGLBackgroundStyleLayer.mm in Sources */,
 				DA551B841DB496AC0009AFAF /* MGLTileSource.mm in Sources */,
+				CFF9F98D23A2505700B0DE92 /* MGLNetworkIntegrationManager.m in Sources */,
 				DAE6C3B81CC31EF300DB3429 /* MGLMapView+IBAdditions.mm in Sources */,
 				DA35A2D01CCAAED300E826B2 /* NSValue+MGLAdditions.m in Sources */,
 				3538AA241D542685008EC33D /* MGLStyleLayer.mm in Sources */,
@@ -1676,7 +1716,7 @@
 				DA35A2A61CC9EB2700E826B2 /* MGLCoordinateFormatter.m in Sources */,
 				352742821D4C243B00A1ECE6 /* MGLSource.mm in Sources */,
 				DAE6C3881CC31E2A00DB3429 /* MGLMapCamera.mm in Sources */,
-				DA6408D81DA4E5DA00908C90 /* MGLVectorStyleLayer.m in Sources */,
+				DA6408D81DA4E5DA00908C90 /* MGLVectorStyleLayer.mm in Sources */,
 				1FF4858D2237235300F19727 /* MGLAttributedExpression.m in Sources */,
 				DA8F25B31D51CB270010E6B5 /* NSValue+MGLStyleAttributeAdditions.mm in Sources */,
 				DAE6C3911CC31E2A00DB3429 /* MGLPolygon.mm in Sources */,
@@ -1692,11 +1732,11 @@
 				DAE6C3921CC31E2A00DB3429 /* MGLPolyline.mm in Sources */,
 				3527428A1D4C245800A1ECE6 /* MGLShapeSource.mm in Sources */,
 				DAE6C3B51CC31EF300DB3429 /* MGLCompassCell.m in Sources */,
-				1F8A5A05216D4696004DFE75 /* MGLLoggingConfiguration.m in Sources */,
 				DA8F25901D51CA600010E6B5 /* MGLRasterStyleLayer.mm in Sources */,
 				DAD165751CF4CD7A001FF4B9 /* MGLShapeCollection.mm in Sources */,
 				92FC0AE6207CDD8D007B6B54 /* MGLShapeOfflineRegion.mm in Sources */,
 				35C5D8481D6DD66D00E95907 /* NSComparisonPredicate+MGLAdditions.mm in Sources */,
+				5591AC6B2298361600FF9ADF /* MGLMapView+Impl.mm in Sources */,
 				DA35A2AE1CCA091800E826B2 /* MGLCompassDirectionFormatter.m in Sources */,
 				DACA8623201920BE00E9693A /* MGLRasterDEMSource.mm in Sources */,
 				DA8F258C1D51CA540010E6B5 /* MGLLineStyleLayer.mm in Sources */,
@@ -1718,10 +1758,12 @@
 				1F7454AB1ED1DDBD00021D39 /* MGLLightTest.mm in Sources */,
 				07A240941F675674002C8210 /* MGLComputedShapeSourceTests.m in Sources */,
 				DAEDC4371D606291000224FF /* MGLAttributionButtonTests.m in Sources */,
+				CA0B3C072329F7E700E4B493 /* MGLTestAssertionHandler.m in Sources */,
 				DA695424215B1E6C002041A4 /* MGLMapCameraTests.m in Sources */,
 				920A3E591E6F859D00C16EFC /* MGLSourceQueryTests.m in Sources */,
 				DA35A2B61CCA14D700E826B2 /* MGLCompassDirectionFormatterTests.m in Sources */,
 				35C6DF871E214C1800ACA483 /* MGLDistanceFormatterTests.m in Sources */,
+				CAD9D0AC22A88A32001B25EE /* MGLResourceTests.mm in Sources */,
 				DAE6C3D21CC34C9900DB3429 /* MGLGeometryTests.mm in Sources */,
 				DA87A9A41DCACC5000810D09 /* MGLSymbolStyleLayerTests.mm in Sources */,
 				40E1601D1DF217D6005EA6D9 /* MGLStyleLayerTests.m in Sources */,
@@ -1732,6 +1774,7 @@
 				DA87A9A61DCACC5000810D09 /* MGLCircleStyleLayerTests.mm in Sources */,
 				DA87A99E1DC9DC2100810D09 /* MGLPredicateTests.mm in Sources */,
 				DD58A4C91D822C6700E1F038 /* MGLExpressionTests.mm in Sources */,
+				CA0B3C092329FB4800E4B493 /* MGLOfflinePackTests.mm in Sources */,
 				170A82C4201FB6EC00943087 /* MGLHeatmapColorTests.mm in Sources */,
 				4031ACFC1E9EB3C100A3EA26 /* MGLMapViewDelegateIntegrationTests.swift in Sources */,
 				CA8FBC0D21A4A74300D1203C /* MGLRendererConfigurationTests.mm in Sources */,
@@ -1740,7 +1783,6 @@
 				DAA999011E9F5EC5002E6EA6 /* MGLFillExtrusionStyleLayerTests.mm in Sources */,
 				DA29875A1E1A4290002299F5 /* MGLDocumentationExampleTests.swift in Sources */,
 				07BA4CAC1EE21887004528F5 /* MGLImageSourceTests.m in Sources */,
-				DAE6C3D31CC34C9900DB3429 /* MGLOfflinePackTests.m in Sources */,
 				DA87A9A51DCACC5000810D09 /* MGLLineStyleLayerTests.mm in Sources */,
 				DA87A9A31DCACC5000810D09 /* MGLRasterStyleLayerTests.mm in Sources */,
 				CA9461A620884CCB0015EB12 /* MGLAnnotationTests.m in Sources */,
@@ -1946,6 +1988,7 @@
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_IDENTITY = "-";
@@ -2012,6 +2055,7 @@
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_IDENTITY = "-";

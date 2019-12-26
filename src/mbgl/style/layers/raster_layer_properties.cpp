@@ -1,3 +1,5 @@
+// clang-format off
+
 // This file is generated. Edit scripts/generate-style-code.js, then run `make style-code`.
 
 #include <mbgl/style/layers/raster_layer_properties.hpp>
@@ -19,9 +21,15 @@ RasterLayerProperties::RasterLayerProperties(
 
 RasterLayerProperties::~RasterLayerProperties() = default;
 
+unsigned long RasterLayerProperties::constantsMask() const {
+    return evaluated.constantsMask();
+}
+
 const RasterLayer::Impl& RasterLayerProperties::layerImpl() const {
     return static_cast<const RasterLayer::Impl&>(*baseImpl);
 }
 
 } // namespace style
 } // namespace mbgl
+
+// clang-format on

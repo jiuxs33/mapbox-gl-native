@@ -2,7 +2,7 @@
 
 #include <mbgl/map/map.hpp>
 #include <mbgl/map/map_options.hpp>
-#include <mbgl/gl/headless_frontend.hpp>
+#include <mbgl/gfx/headless_frontend.hpp>
 #include <mbgl/storage/resource_options.hpp>
 #include <mbgl/style/style.hpp>
 #include <mbgl/style/sources/custom_geometry_source.hpp>
@@ -64,5 +64,5 @@ TEST(CustomGeometrySource, Grid) {
     layer->setLineColor(Color{ 1.0, 1.0, 1.0, 1.0 });
     map.getStyle().addLayer(std::move(layer));
 
-    test::checkImage("test/fixtures/custom_geometry_source/grid", frontend.render(map), 0.0006, 0.1);
+    test::checkImage("test/fixtures/custom_geometry_source/grid", frontend.render(map).image, 0.0006, 0.1);
 }

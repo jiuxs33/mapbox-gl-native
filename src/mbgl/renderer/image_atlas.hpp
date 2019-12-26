@@ -20,6 +20,7 @@ class ImagePosition {
 public:
     ImagePosition(const mapbox::Bin&, const style::Image::Impl&, uint32_t version = 0);
 
+    static constexpr const uint16_t padding = 1u;
     float pixelRatio;
     Rect<uint16_t> textureRect;
     uint32_t version;
@@ -50,9 +51,26 @@ public:
             textureRect.h / pixelRatio,
         }};
     }
+
+    Rect<uint16_t> paddedTextureRect() const {
+        return {static_cast<uint16_t>(textureRect.x - padding),
+                static_cast<uint16_t>(textureRect.y - padding),
+                static_cast<uint16_t>(textureRect.w + padding * 2),
+                static_cast<uint16_t>(textureRect.h + padding * 2)};
+    }
 };
 
 using ImagePositions = std::map<std::string, ImagePosition>;
+
+class ImagePatch {
+public:
+    ImagePatch(Immutable<style::Image::Impl> image_,
+               const Rect<uint16_t>& textureRect_)
+        : image(std::move(image_))
+        , textureRect(textureRect_) {}
+    Immutable<style::Image::Impl> image;
+    Rect<uint16_t> textureRect;
+};
 
 class ImageAtlas {
 public:
@@ -60,9 +78,7 @@ public:
     ImagePositions iconPositions;
     ImagePositions patternPositions;
 
-    void patchUpdatedImages(gfx::UploadPass&, gfx::Texture&, const ImageManager&);
-private:
-    void patchUpdatedImage(gfx::UploadPass&, gfx::Texture&, ImagePosition& position, const ImageManager& imageManager, const std::string& name, uint16_t version);
+    std::vector<ImagePatch> getImagePatchesAndUpdateVersions(const ImageManager&);
 };
 
 ImageAtlas makeImageAtlas(const ImageMap&, const ImageMap&, const std::unordered_map<std::string, uint32_t>& versionMap);

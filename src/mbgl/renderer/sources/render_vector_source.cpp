@@ -2,96 +2,36 @@
 #include <mbgl/renderer/render_tile.hpp>
 #include <mbgl/renderer/paint_parameters.hpp>
 #include <mbgl/tile/vector_tile.hpp>
+#include <mbgl/renderer/tile_parameters.hpp>
 
 namespace mbgl {
 
 using namespace style;
 
 RenderVectorSource::RenderVectorSource(Immutable<style::VectorSource::Impl> impl_)
-    : RenderSource(impl_) {
-    tilePyramid.setObserver(this);
+    : RenderTileSetSource(std::move(impl_)) {
 }
 
-const style::VectorSource::Impl& RenderVectorSource::impl() const {
-    return static_cast<const style::VectorSource::Impl&>(*baseImpl);
+const optional<Tileset>& RenderVectorSource::getTileset() const {
+    return static_cast<const style::VectorSource::Impl&>(*baseImpl).tileset;
 }
 
-bool RenderVectorSource::isLoaded() const {
-    return tilePyramid.isLoaded();
-}
-
-void RenderVectorSource::update(Immutable<style::Source::Impl> baseImpl_,
-                                const std::vector<Immutable<style::LayerProperties>>& layers,
-                                const bool needsRendering,
-                                const bool needsRelayout,
-                                const TileParameters& parameters) {
-    std::swap(baseImpl, baseImpl_);
-
-    enabled = needsRendering;
-
-    optional<Tileset> _tileset = impl().getTileset();
-
-    if (tileset != _tileset) {
-        tileset = _tileset;
-
-        // TODO: this removes existing buckets, and will cause flickering.
-        // Should instead refresh tile data in place.
-        tilePyramid.clearAll();
-    }
-    // Allow clearing the tile pyramid first, before the early return in case
-    //  the new tileset is not yet available or has an error in loading
-    if (!_tileset) {
-        return;
-    }
-
+void RenderVectorSource::updateInternal(const Tileset& tileset,
+                                        const std::vector<Immutable<style::LayerProperties>>& layers,
+                                        const bool needsRendering,
+                                        const bool needsRelayout,
+                                        const TileParameters& parameters) {
     tilePyramid.update(layers,
                        needsRendering,
                        needsRelayout,
                        parameters,
                        SourceType::Vector,
                        util::tileSize,
-                       tileset->zoomRange,
-                       tileset->bounds,
+                       tileset.zoomRange,
+                       tileset.bounds,
                        [&] (const OverscaledTileID& tileID) {
-                           return std::make_unique<VectorTile>(tileID, impl().id, parameters, *tileset);
+                           return std::make_unique<VectorTile>(tileID, baseImpl->id, parameters, tileset);
                        });
-}
-
-void RenderVectorSource::upload(gfx::UploadPass& parameters) {
-    tilePyramid.upload(parameters);
-}
-
-void RenderVectorSource::prepare(PaintParameters& parameters) {
-    tilePyramid.prepare(parameters);
-}
-
-void RenderVectorSource::finishRender(PaintParameters& parameters) {
-    tilePyramid.finishRender(parameters);
-}
-
-std::vector<std::reference_wrapper<RenderTile>> RenderVectorSource::getRenderTiles() {
-    return tilePyramid.getRenderTiles();
-}
-
-std::unordered_map<std::string, std::vector<Feature>>
-RenderVectorSource::queryRenderedFeatures(const ScreenLineString& geometry,
-                                          const TransformState& transformState,
-                                          const std::vector<const RenderLayer*>& layers,
-                                          const RenderedQueryOptions& options,
-                                          const mat4& projMatrix) const {
-    return tilePyramid.queryRenderedFeatures(geometry, transformState, layers, options, projMatrix);
-}
-
-std::vector<Feature> RenderVectorSource::querySourceFeatures(const SourceQueryOptions& options) const {
-    return tilePyramid.querySourceFeatures(options);
-}
-
-void RenderVectorSource::reduceMemoryUse() {
-    tilePyramid.reduceMemoryUse();
-}
-
-void RenderVectorSource::dumpDebugLogs() const {
-    tilePyramid.dumpDebugLogs();
 }
 
 } // namespace mbgl

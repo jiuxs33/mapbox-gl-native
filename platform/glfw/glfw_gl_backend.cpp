@@ -58,7 +58,7 @@ mbgl::gl::ProcAddress GLFWGLBackend::getExtensionFunctionPointer(const char* nam
 
 void GLFWGLBackend::updateAssumedState() {
     assumeFramebufferBinding(0);
-    assumeViewport(0, 0, size);
+    setViewport(0, 0, size);
 }
 
 mbgl::Size GLFWGLBackend::getSize() const {
@@ -72,3 +72,15 @@ void GLFWGLBackend::setSize(const mbgl::Size newSize) {
 void GLFWGLBackend::swap() {
     glfwSwapBuffers(window);
 }
+
+namespace mbgl {
+namespace gfx {
+
+template <>
+std::unique_ptr<GLFWBackend>
+Backend::Create<mbgl::gfx::Backend::Type::OpenGL>(GLFWwindow* window, bool capFrameRate) {
+    return std::make_unique<GLFWGLBackend>(window, capFrameRate);
+}
+
+} // namespace gfx
+} // namespace mbgl

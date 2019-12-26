@@ -10,7 +10,7 @@ macro(mbgl_platform_core)
         target_add_mason_package(mbgl-core PUBLIC swiftshader)
     else()
         target_sources(mbgl-core
-            PRIVATE platform/darwin/src/headless_backend_cgl.cpp
+            PRIVATE platform/darwin/src/headless_backend_cgl.mm
         )
         target_link_libraries(mbgl-core
             PUBLIC "-framework OpenGL"
@@ -70,6 +70,10 @@ endmacro()
 
 
 macro(mbgl_platform_offline)
+    target_sources(mbgl-offline
+        PRIVATE platform/default/src/mbgl/layermanager/layer_manager.cpp
+    )
+
     target_link_libraries(mbgl-offline
         PRIVATE mbgl-filesource
         PRIVATE mbgl-loop-darwin

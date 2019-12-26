@@ -57,32 +57,32 @@ std::vector<GeometryCollection> classifyRings(const GeometryCollection& rings) {
     std::size_t len = rings.size();
 
     if (len <= 1) {
-        polygons.push_back(rings);
+        polygons.emplace_back(rings.clone());
         return polygons;
     }
 
     GeometryCollection polygon;
     int8_t ccw = 0;
 
-    for (std::size_t i = 0; i < len; i++) {
-        double area = signedArea(rings[i]);
+    for (const auto& ring : rings) {
+        double area = signedArea(ring);
+        if (area == 0) continue;
 
-        if (area == 0)
-            continue;
-
-        if (ccw == 0)
+        if (ccw == 0) {
             ccw = (area < 0 ? -1 : 1);
-
-        if (ccw == (area < 0 ? -1 : 1) && !polygon.empty()) {
-            polygons.push_back(polygon);
-            polygon.clear();
         }
 
-        polygon.push_back(rings[i]);
+        if (ccw == (area < 0 ? -1 : 1) && !polygon.empty()) {
+            polygons.emplace_back(std::move(polygon));
+            polygon = GeometryCollection();
+        }
+
+        polygon.emplace_back(ring);
     }
 
-    if (!polygon.empty())
-        polygons.push_back(polygon);
+    if (!polygon.empty()) {
+        polygons.emplace_back(std::move(polygon));
+    }
 
     return polygons;
 }
@@ -101,8 +101,8 @@ void limitHoles(GeometryCollection& polygon, uint32_t maxHoles) {
 
 static Feature::geometry_type convertGeometry(const GeometryTileFeature& geometryTileFeature, const CanonicalTileID& tileID) {
     const double size = util::EXTENT * std::pow(2, tileID.z);
-    const double x0 = util::EXTENT * tileID.x;
-    const double y0 = util::EXTENT * tileID.y;
+    const double x0 = util::EXTENT * static_cast<double>(tileID.x);
+    const double y0 = util::EXTENT * static_cast<double>(tileID.y);
 
     auto tileCoordinatesToLatLng = [&] (const Point<int16_t>& p) {
         double y2 = 180 - (p.y + y0) * 360 / size;
@@ -112,7 +112,7 @@ static Feature::geometry_type convertGeometry(const GeometryTileFeature& geometr
         );
     };
 
-    GeometryCollection geometries = geometryTileFeature.getGeometries();
+    const GeometryCollection& geometries = geometryTileFeature.getGeometries();
 
     switch (geometryTileFeature.getType()) {
         case FeatureType::Unknown: {
@@ -178,6 +178,16 @@ Feature convertFeature(const GeometryTileFeature& geometryTileFeature, const Can
     feature.properties = geometryTileFeature.getProperties();
     feature.id = geometryTileFeature.getID();
     return feature;
+}
+
+const PropertyMap& GeometryTileFeature::getProperties() const {
+    static const PropertyMap dummy;
+    return dummy;
+}
+
+const GeometryCollection& GeometryTileFeature::getGeometries() const {
+    static const GeometryCollection dummy;
+    return dummy;
 }
 
 } // namespace mbgl

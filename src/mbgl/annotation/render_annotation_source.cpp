@@ -10,17 +10,13 @@ namespace mbgl {
 using namespace style;
 
 RenderAnnotationSource::RenderAnnotationSource(Immutable<AnnotationSource::Impl> impl_)
-    : RenderSource(impl_) {
+    : RenderTileSource(std::move(impl_)) {
     assert(LayerManager::annotationsEnabled);
     tilePyramid.setObserver(this);
 }
 
 const AnnotationSource::Impl& RenderAnnotationSource::impl() const {
     return static_cast<const AnnotationSource::Impl&>(*baseImpl);
-}
-
-bool RenderAnnotationSource::isLoaded() const {
-    return tilePyramid.isLoaded();
 }
 
 void RenderAnnotationSource::update(Immutable<style::Source::Impl> baseImpl_,
@@ -47,41 +43,18 @@ void RenderAnnotationSource::update(Immutable<style::Source::Impl> baseImpl_,
                        });
 }
 
-void RenderAnnotationSource::upload(gfx::UploadPass& uploadPass) {
-    tilePyramid.upload(uploadPass);
-}
-
-void RenderAnnotationSource::prepare(PaintParameters& parameters) {
-    tilePyramid.prepare(parameters);
-}
-
-void RenderAnnotationSource::finishRender(PaintParameters& parameters) {
-    tilePyramid.finishRender(parameters);
-}
-
-std::vector<std::reference_wrapper<RenderTile>> RenderAnnotationSource::getRenderTiles() {
-    return tilePyramid.getRenderTiles();
-}
-
 std::unordered_map<std::string, std::vector<Feature>>
 RenderAnnotationSource::queryRenderedFeatures(const ScreenLineString& geometry,
                                               const TransformState& transformState,
-                                              const std::vector<const RenderLayer*>& layers,
+                                              const std::unordered_map<std::string, const RenderLayer*>& layers,
                                               const RenderedQueryOptions& options,
                                               const mat4& projMatrix) const {
-    return tilePyramid.queryRenderedFeatures(geometry, transformState, layers, options, projMatrix);
+    return tilePyramid.queryRenderedFeatures(geometry, transformState, layers, options, projMatrix, {});
 }
 
 std::vector<Feature> RenderAnnotationSource::querySourceFeatures(const SourceQueryOptions&) const {
     return {};
 }
 
-void RenderAnnotationSource::reduceMemoryUse() {
-    tilePyramid.reduceMemoryUse();
-}
-
-void RenderAnnotationSource::dumpDebugLogs() const {
-    tilePyramid.dumpDebugLogs();
-}
 
 } // namespace mbgl

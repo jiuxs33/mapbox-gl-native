@@ -44,7 +44,6 @@ public:
     MapRenderer(jni::JNIEnv& _env,
                 const jni::Object<MapRenderer>&,
                 jni::jfloat pixelRatio,
-                const jni::String& programCacheDir,
                 const jni::String& localIdeographFontFamily);
 
     ~MapRenderer() override;
@@ -68,7 +67,8 @@ public:
 
     // From Scheduler. Schedules by using callbacks to the
     // JVM to process the mailbox on the right thread.
-    void schedule(std::weak_ptr<Mailbox> scheduled) override;
+    void schedule(std::function<void()> scheduled) override;
+    mapbox::base::WeakPtr<Scheduler> makeWeakPtr() override { return weakFactory.makeWeakPtr(); }
 
     void requestRender();
 
@@ -104,7 +104,6 @@ private:
     jni::WeakReference<jni::Object<MapRenderer>, jni::EnvAttachingDeleter> javaPeer;
 
     float pixelRatio;
-    std::string programCacheDir;
     optional<std::string> localIdeographFontFamily;
 
     std::shared_ptr<ThreadPool> threadPool;
@@ -124,6 +123,7 @@ private:
     std::atomic<bool> destroyed {false};
 
     std::unique_ptr<SnapshotCallback> snapshotCallback;
+    mapbox::base::WeakPtrFactory<Scheduler> weakFactory{this};
 };
 
 } // namespace android

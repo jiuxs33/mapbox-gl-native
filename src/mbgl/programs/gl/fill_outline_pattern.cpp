@@ -1,5 +1,5 @@
 // NOTE: DO NOT CHANGE THIS FILE. IT IS AUTOMATICALLY GENERATED.
-
+// clang-format off
 #include <mbgl/programs/fill_outline_pattern_program.hpp>
 #include <mbgl/programs/gl/preludes.hpp>
 #include <mbgl/programs/gl/shader_source.hpp>
@@ -15,7 +15,7 @@ struct ShaderSource;
 template <>
 struct ShaderSource<FillOutlinePatternProgram> {
     static constexpr const char* name = "fill_outline_pattern";
-    static constexpr const uint8_t hash[8] = { 0x56, 0x9c, 0x2f, 0x58, 0x6b, 0x31, 0xff, 0x84 };
+    static constexpr const uint8_t hash[8] = {0x56, 0x9c, 0x2f, 0x58, 0x6b, 0x31, 0xff, 0x84};
     static constexpr const auto vertexOffset = 15137;
     static constexpr const auto fragmentOffset = 16997;
 };
@@ -29,8 +29,8 @@ constexpr const uint8_t ShaderSource<FillOutlinePatternProgram>::hash[8];
 namespace gfx {
 
 template <>
-std::unique_ptr<Program<FillOutlinePatternProgram>>
-Context::createProgram<gl::Context>(const ProgramParameters& programParameters) {
+std::unique_ptr<gfx::Program<FillOutlinePatternProgram>>
+Backend::Create<gfx::Backend::Type::OpenGL>(const ProgramParameters& programParameters) {
     return std::make_unique<gl::Program<FillOutlinePatternProgram>>(programParameters);
 }
 
@@ -202,4 +202,4 @@ void main() {
 }
 
 */
-
+// clang-format on

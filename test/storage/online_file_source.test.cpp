@@ -98,7 +98,7 @@ TEST(OnlineFileSource, TEST_REQUIRES_SERVER(ConnectionError)) {
         static int wait = 0;
         const auto duration = std::chrono::duration<const double>(Clock::now() - start).count();
         EXPECT_LT(wait - 0.01, duration) << "Backoff timer didn't wait 1 second";
-        EXPECT_GT(wait + 0.2, duration) << "Backoff timer fired too late";
+        EXPECT_GT(wait + 0.3, duration) << "Backoff timer fired too late";
         ASSERT_NE(nullptr, res.error);
         EXPECT_EQ(Response::Error::Reason::Connection, res.error->reason);
         ASSERT_FALSE(res.data.get());
@@ -481,7 +481,7 @@ TEST(OnlineFileSource, TEST_REQUIRES_SERVER(LowHighPriorityRequestsMany)) {
 
     for (int num_reqs = 0; num_reqs < 20; num_reqs++) {
         if (num_reqs % 2 == 0) {
-            std::unique_ptr<AsyncRequest> req = fs.request({ Resource::Unknown, "http://127.0.0.1:3000/load/" + std::to_string(num_reqs), Resource::Priority::Regular }, [&](Response) {
+            std::unique_ptr<AsyncRequest> req = fs.request({ Resource::Unknown, "http://127.0.0.1:3000/load/" + std::to_string(num_reqs) }, [&](Response) {
                 response_counter++;
 
                 if (response_counter <= 10) { // count the high priority requests that arrive late correctly
@@ -491,7 +491,10 @@ TEST(OnlineFileSource, TEST_REQUIRES_SERVER(LowHighPriorityRequestsMany)) {
             collector.push_back(std::move(req));
         }
         else {
-            std::unique_ptr<AsyncRequest> req = fs.request({ Resource::Unknown, "http://127.0.0.1:3000/load/" + std::to_string(num_reqs), Resource::Priority::Low }, [&](Response) {
+            Resource resource = { Resource::Unknown, "http://127.0.0.1:3000/load/" + std::to_string(num_reqs) };
+            resource.setPriority(Resource::Priority::Low);
+
+            std::unique_ptr<AsyncRequest> req = fs.request(std::move(resource), [&](Response) {
                 response_counter++;
 
                 if (response_counter > 10) { // count the low priority requests that arrive late correctly

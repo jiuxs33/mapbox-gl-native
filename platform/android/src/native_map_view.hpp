@@ -62,13 +62,14 @@ public:
     void onDidFinishLoadingMap() override;
     void onDidFailLoadingMap(MapLoadError, const std::string&) override;
     void onWillStartRenderingFrame() override;
-    void onDidFinishRenderingFrame(MapObserver::RenderMode) override;
+    void onDidFinishRenderingFrame(MapObserver::RenderFrameStatus) override;
     void onWillStartRenderingMap() override;
     void onDidFinishRenderingMap(MapObserver::RenderMode) override;
     void onDidBecomeIdle() override;
     void onDidFinishLoadingStyle() override;
     void onSourceChanged(mbgl::style::Source&) override;
     void onStyleImageMissing(const std::string&) override;
+    bool onCanRemoveUnusedStyleImage(const std::string&) override;
 
     // JNI //
 
@@ -90,15 +91,15 @@ public:
 
     void moveBy(jni::JNIEnv&, jni::jdouble, jni::jdouble, jni::jlong);
 
-    void jumpTo(jni::JNIEnv&, jni::jdouble, jni::jdouble, jni::jdouble, jni::jdouble, jni::jdouble);
+    void jumpTo(jni::JNIEnv&, jni::jdouble, jni::jdouble, jni::jdouble, jni::jdouble, jni::jdouble, const jni::Array<jni::jdouble>&);
 
-    void easeTo(jni::JNIEnv&, jni::jdouble, jni::jdouble, jni::jdouble, jni::jlong, jni::jdouble, jni::jdouble, jni::jboolean);
+    void easeTo(jni::JNIEnv&, jni::jdouble, jni::jdouble, jni::jdouble, jni::jlong, jni::jdouble, jni::jdouble, const jni::Array<jni::jdouble>&, jni::jboolean);
 
-    void flyTo(jni::JNIEnv&, jni::jdouble, jni::jdouble, jni::jdouble, jni::jlong, jni::jdouble, jni::jdouble);
+    void flyTo(jni::JNIEnv&, jni::jdouble, jni::jdouble, jni::jdouble, jni::jlong, jni::jdouble, jni::jdouble, const jni::Array<jni::jdouble>&);
 
     jni::Local<jni::Object<LatLng>> getLatLng(JNIEnv&);
 
-    void setLatLng(jni::JNIEnv&, jni::jdouble, jni::jdouble, jni::jlong);
+    void setLatLng(jni::JNIEnv&, jni::jdouble, jni::jdouble, const jni::Array<jni::jdouble>&, jni::jlong);
 
     jni::Local<jni::Object<CameraPosition>> getCameraForLatLngBounds(jni::JNIEnv&, const jni::Object<mbgl::android::LatLngBounds>&, double top, double left, double bottom, double right, double bearing, double tilt);
 
@@ -138,10 +139,6 @@ public:
 
     void setVisibleCoordinateBounds(JNIEnv&, const jni::Array<jni::Object<LatLng>>&, const jni::Object<RectF>&, jni::jdouble, jni::jlong);
 
-    void setContentPadding(JNIEnv&, float, float, float, float);
-
-    jni::Local<jni::Array<jni::jfloat>> getContentPadding(JNIEnv&);
-
     void scheduleSnapshot(jni::JNIEnv&);
 
     jni::Local<jni::Object<CameraPosition>> getCameraPosition(jni::JNIEnv&);
@@ -154,8 +151,6 @@ public:
 
     void setDebug(JNIEnv&, jni::jboolean);
 
-    void cycleDebugOptions(JNIEnv&);
-
     jni::jboolean getDebug(JNIEnv&);
 
     jni::jboolean isFullyLoaded(JNIEnv&);
@@ -166,9 +161,13 @@ public:
 
     jni::Local<jni::Object<PointF>> pixelForLatLng(JNIEnv&, jdouble, jdouble);
 
+    void pixelsForLatLngs(JNIEnv&, const jni::Array<jdouble>&, jni::Array<jdouble>&, jfloat);
+
     jni::Local<jni::Object<LatLng>> latLngForProjectedMeters(JNIEnv&, jdouble, jdouble);
 
     jni::Local<jni::Object<LatLng>> latLngForPixel(JNIEnv&, jfloat, jfloat);
+
+    void latLngsForPixels(JNIEnv&, const jni::Array<jdouble>&, jni::Array<jdouble>&, jfloat);
 
     jni::Local<jni::Array<jlong>> addPolylines(JNIEnv&, const jni::Array<jni::Object<Polyline>>&);
 
@@ -238,6 +237,10 @@ public:
 
     jni::jboolean getPrefetchTiles(JNIEnv&);
 
+    void setPrefetchZoomDelta(JNIEnv&, jni::jint);
+
+    jni::jint getPrefetchZoomDelta(JNIEnv&);
+
     mbgl::Map& getMap();
 
 private:
@@ -258,7 +261,6 @@ private:
 
     // Ensure these are initialised last
     std::unique_ptr<mbgl::Map> map;
-    mbgl::EdgeInsets insets;
 };
 
 } // namespace android

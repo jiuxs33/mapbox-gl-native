@@ -18,7 +18,9 @@ class OverscaledTileID;
 class PatternDependency;
 using PatternLayerMap = std::map<std::string, PatternDependency>;
 class Placement;
+class TransformState;
 class BucketPlacementParameters;
+class RenderTile;
 
 class Bucket {
 public:
@@ -30,10 +32,10 @@ public:
     // Feature geometries are also used to populate the feature index.
     // Obtaining these is a costly operation, so we do it only once, and
     // pass-by-const-ref the geometries as a second parameter.
-    virtual void addFeature(const GeometryTileFeature&,
-                            const GeometryCollection&,
-                            const ImagePositions&,
-                            const PatternLayerMap&) {};
+    virtual void addFeature(const GeometryTileFeature&, const GeometryCollection&, const ImagePositions&,
+                            const PatternLayerMap&, std::size_t){};
+
+    virtual void update(const FeatureStates&, const GeometryTileLayer&, const std::string&, const ImagePositions&) {}
 
     // As long as this bucket has a Prepare render pass, this function is getting called. Typically,
     // this only happens once when the bucket is being rendered for the first time.
@@ -57,9 +59,10 @@ public:
     virtual std::pair<uint32_t, bool> registerAtCrossTileIndex(CrossTileSymbolLayerIndex&, const OverscaledTileID&, uint32_t&) {
         return std::make_pair(0u, false);
     }
-    // Places this bucket to the given placement. Returns bucket cross-tile id on success call; `0` otherwise.
-    virtual uint32_t place(Placement&, const BucketPlacementParameters&, std::set<uint32_t>&) { return 0u; }
-    virtual void updateOpacities(Placement&, std::set<uint32_t>&) {}
+    // Places this bucket to the given placement.
+    virtual void place(Placement&, const BucketPlacementParameters&, std::set<uint32_t>&) {}
+    virtual void updateVertices(
+        const Placement&, bool /*updateOpacities*/, const TransformState&, const RenderTile&, std::set<uint32_t>&) {}
 
 protected:
     Bucket() = default;

@@ -11,6 +11,7 @@
 #include <mbgl/tile/tile.hpp>
 
 #include <mbgl/layermanager/layer_manager.hpp>
+#include <mbgl/util/constants.hpp>
 #include <utility>
 
 namespace mbgl {
@@ -55,6 +56,8 @@ RenderSource::RenderSource(Immutable<style::Source::Impl> impl)
       observer(&nullObserver) {
 }
 
+RenderSource::~RenderSource() = default;
+
 void RenderSource::setObserver(RenderSourceObserver* observer_) {
     observer = observer_;
 }
@@ -69,6 +72,11 @@ void RenderSource::onTileError(Tile& tile, std::exception_ptr error) {
 
 bool RenderSource::isEnabled() const {
     return enabled;
+}
+
+uint8_t RenderSource::getMaxZoom() const { 
+    assert(false);
+    return util::TERRAIN_RGB_MAXZOOM;
 }
 
 } // namespace mbgl

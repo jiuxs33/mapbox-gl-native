@@ -7,8 +7,21 @@
 namespace mbgl {
 namespace android {
 
-// OfflineManager //
+namespace {
+// Reattach, the callback comes from a different thread
+void handleException(std::exception_ptr exception,
+                     const jni::Object<OfflineManager::FileSourceCallback>& callback,
+                     android::UniqueEnv env = android::AttachEnv()) {
+    if (exception) {
+        OfflineManager::FileSourceCallback::onError(
+            *env, callback, jni::Make<jni::String>(*env, mbgl::util::toString(exception)));
+    } else {
+        OfflineManager::FileSourceCallback::onSuccess(*env, callback);
+    }
+}
+} // namespace
 
+// OfflineManager //
 OfflineManager::OfflineManager(jni::JNIEnv& env, const jni::Object<FileSource>& jFileSource)
     : fileSource(std::static_pointer_cast<DefaultFileSource>(mbgl::FileSource::getSharedFileSource(FileSource::getSharedResourceOptions(env, jFileSource)))) {}
 
@@ -104,16 +117,92 @@ void OfflineManager::mergeOfflineRegions(jni::JNIEnv& env_, const jni::Object<Fi
     });
 }
 
+void OfflineManager::resetDatabase(jni::JNIEnv& env_, const jni::Object<FileSourceCallback>& callback_) {
+    auto globalCallback = jni::NewGlobal<jni::EnvAttachingDeleter>(env_, callback_);
+
+    fileSource->resetDatabase(
+        [
+            // Keep a shared ptr to a global reference of the callback so they are not GC'd in the meanwhile
+            callback = std::make_shared<decltype(globalCallback)>(std::move(globalCallback))](
+            std::exception_ptr exception) mutable { handleException(exception, *callback); });
+}
+
+void OfflineManager::packDatabase(jni::JNIEnv& env_, const jni::Object<FileSourceCallback>& callback_) {
+    auto globalCallback = jni::NewGlobal<jni::EnvAttachingDeleter>(env_, callback_);
+
+    fileSource->packDatabase(
+        [
+            // Keep a shared ptr to a global reference of the callback so they are not GC'd in the meanwhile
+            callback = std::make_shared<decltype(globalCallback)>(std::move(globalCallback))](
+            std::exception_ptr exception) mutable { handleException(exception, *callback); });
+}
+
+void OfflineManager::invalidateAmbientCache(jni::JNIEnv& env_, const jni::Object<FileSourceCallback>& callback_) {
+    auto globalCallback = jni::NewGlobal<jni::EnvAttachingDeleter>(env_, callback_);
+
+    fileSource->invalidateAmbientCache(
+        [
+            // Keep a shared ptr to a global reference of the callback so they are not GC'd in the meanwhile
+            callback = std::make_shared<decltype(globalCallback)>(std::move(globalCallback))](
+            std::exception_ptr exception) mutable { handleException(exception, *callback); });
+}
+
+void OfflineManager::clearAmbientCache(jni::JNIEnv& env_, const jni::Object<FileSourceCallback>& callback_) {
+    auto globalCallback = jni::NewGlobal<jni::EnvAttachingDeleter>(env_, callback_);
+
+    fileSource->clearAmbientCache(
+        [
+            // Keep a shared ptr to a global reference of the callback so they are not GC'd in the meanwhile
+            callback = std::make_shared<decltype(globalCallback)>(std::move(globalCallback))](
+            std::exception_ptr exception) mutable { handleException(exception, *callback); });
+}
+
+void OfflineManager::setMaximumAmbientCacheSize(jni::JNIEnv& env_, const jni::jlong size_, const jni::Object<FileSourceCallback>& callback_) {
+    auto globalCallback = jni::NewGlobal<jni::EnvAttachingDeleter>(env_, callback_);
+
+    fileSource->setMaximumAmbientCacheSize(
+        size_,
+        [
+            // Keep a shared ptr to a global reference of the callback so they are not GC'd in the meanwhile
+            callback = std::make_shared<decltype(globalCallback)>(std::move(globalCallback))](
+            std::exception_ptr exception) mutable { handleException(exception, *callback); });
+}
+
+void OfflineManager::runPackDatabaseAutomatically(jni::JNIEnv&, jboolean autopack) {
+    fileSource->runPackDatabaseAutomatically(autopack);
+}
+
+// FileSource::FileSourceCallback //
+
+void OfflineManager::FileSourceCallback::onSuccess(jni::JNIEnv& env,
+                                               const jni::Object<OfflineManager::FileSourceCallback>& callback) {
+    static auto& javaClass = jni::Class<OfflineManager::FileSourceCallback>::Singleton(env);
+    static auto method = javaClass.GetMethod<void ()>(env, "onSuccess");
+    callback.Call(env, method);
+}
+
+void OfflineManager::FileSourceCallback::onError(jni::JNIEnv& env,
+                                             const jni::Object<OfflineManager::FileSourceCallback>& callback,
+                                             const jni::String& message) {
+    static auto& javaClass = jni::Class<OfflineManager::FileSourceCallback>::Singleton(env);
+    static auto method = javaClass.GetMethod<void (jni::String)>(env, "onError");
+    callback.Call(env, method, message);
+}
+
 void OfflineManager::registerNative(jni::JNIEnv& env) {
     jni::Class<ListOfflineRegionsCallback>::Singleton(env);
     jni::Class<CreateOfflineRegionCallback>::Singleton(env);
     jni::Class<MergeOfflineRegionsCallback>::Singleton(env);
+    jni::Class<FileSourceCallback>::Singleton(env);
 
     static auto& javaClass = jni::Class<OfflineManager>::Singleton(env);
 
     #define METHOD(MethodPtr, name) jni::MakeNativePeerMethod<decltype(MethodPtr), (MethodPtr)>(name)
 
-    jni::RegisterNativePeer<OfflineManager>( env, javaClass, "nativePtr",
+    jni::RegisterNativePeer<OfflineManager>(
+        env,
+        javaClass,
+        "nativePtr",
         jni::MakePeer<OfflineManager, const jni::Object<FileSource>&>,
         "initialize",
         "finalize",
@@ -121,6 +210,12 @@ void OfflineManager::registerNative(jni::JNIEnv& env) {
         METHOD(&OfflineManager::listOfflineRegions, "listOfflineRegions"),
         METHOD(&OfflineManager::createOfflineRegion, "createOfflineRegion"),
         METHOD(&OfflineManager::mergeOfflineRegions, "mergeOfflineRegions"),
+        METHOD(&OfflineManager::resetDatabase, "nativeResetDatabase"),
+        METHOD(&OfflineManager::packDatabase, "nativePackDatabase"),
+        METHOD(&OfflineManager::invalidateAmbientCache, "nativeInvalidateAmbientCache"),
+        METHOD(&OfflineManager::clearAmbientCache, "nativeClearAmbientCache"),
+        METHOD(&OfflineManager::setMaximumAmbientCacheSize, "nativeSetMaximumAmbientCacheSize"),
+        METHOD(&OfflineManager::runPackDatabaseAutomatically, "runPackDatabaseAutomatically"),
         METHOD(&OfflineManager::putResourceWithUrl, "putResourceWithUrl"));
 }
 
